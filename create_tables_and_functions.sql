@@ -1,7 +1,12 @@
 CREATE TABLE IF NOT EXISTS xx_eccma_update_log  (date_log  TIMESTAMP,concept_type varchar(100) ,message_log varchar(500));
-CREATE TABLE IF NOT EXISTS xx_eccma_update_terms(id integer,is_deprecated boolean,content text);
-CREATE TABLE IF NOT EXISTS xx_eccma_update_defs(id integer,is_deprecated boolean,content text);
-CREATE TABLE IF NOT EXISTS xx_eccma_update_abbr(id integer,content text);
+CREATE TABLE IF NOT EXISTS xx_eccma_update_terms(id integer, is_deprecated boolean, content text, eccma_eotd varchar(20));
+CREATE TABLE IF NOT EXISTS xx_eccma_update_defs(id integer,is_deprecated boolean,content text, eccma_eotd varchar(20));
+CREATE TABLE IF NOT EXISTS xx_eccma_update_abbr(id integer,content text, eccma_eotd varchar(20));
+
+DROP TABLE xx_eccma_update_log;
+DROP TABLE xx_eccma_update_terms;
+DROP TABLE xx_eccma_update_defs;
+DROP TABLE xx_eccma_update_abbr;
 -----------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION XX_FN_GET_ORGANIZATION(p_organization_id VARCHAR(100)) 
     RETURNS INTEGER AS $$
