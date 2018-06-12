@@ -7,6 +7,7 @@ DROP TABLE xx_eccma_update_log;
 DROP TABLE xx_eccma_update_terms;
 DROP TABLE xx_eccma_update_defs;
 DROP TABLE xx_eccma_update_abbr;
+
 -----------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION XX_FN_GET_ORGANIZATION(p_organization_id VARCHAR(100)) 
     RETURNS INTEGER AS $$
@@ -54,8 +55,8 @@ CREATE OR REPLACE FUNCTION XX_FN_GET_ORGANIZATION(p_organization_id VARCHAR(100)
 	
     $$ LANGUAGE plpgsql;
 	------------------------------------------------------------------------------------------------------
-	CREATE OR REPLACE FUNCTION xx_fn_get_terminological_id(p_concept_type       VARCHAR(50),
-																												 p_eccma_id        	VARCHAR(100),
+	CREATE OR REPLACE FUNCTION xx_fn_get_terminological_id(p_concept_type        VARCHAR(50),
+																												 p_eccma_id        	   VARCHAR(100),
 																												 p_language_id         INTEGER,
 																												 p_concept_id          INTEGER,
 																												 p_organization_id     INTEGER)
@@ -80,3 +81,28 @@ CREATE OR REPLACE FUNCTION XX_FN_GET_ORGANIZATION(p_organization_id VARCHAR(100)
     END;
 	
     $$ LANGUAGE plpgsql;
+
+
+
+DO
+$$
+DECLARE
+	l_record RECORD;
+BEGIN
+	DROP TABLE IF EXISTS xx_eccma_new_concepts;
+	CREATE TABLE IF NOT EXISTS xx_eccma_new_concepts AS (SELECT tmp.*
+																				 FROM tmp1 tmp
+																				 WHERE 1 = 1
+																							 AND NOT EXISTS(SELECT *
+																															FROM concepts con
+																															WHERE con.eccma_eotd = tmp.concept_id)
+	);
+
+	FOR l_record IN (SELECT * FROM xx_eccma_new_concepts) LOOP
+		raise notice '%', l_record.term_id;
+	end loop;
+END;
+$$
+LANGUAGE plpgsql;
+
+SELECT * FROM xx_eccma_new_concepts;

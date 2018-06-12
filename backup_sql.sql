@@ -1,75 +1,72 @@
-     -- si no se obtiene un id para el término de la organizacion entonces lo inserta, si no, lo actualiza
-		 IF l_term_id = 0 THEN
-       raise notice 'Término para crear: %', l_term_id;
-       l_new_term := l_new_term + 1;
-
-       raise notice 'term  %', l_cursor.term_id;
-       raise notice 'concept  %', l_cursor.concept_id_table;
-       raise notice 'language  %', l_language_id;
-       raise notice 'organization  %', l_org_id;
-       l_up_term := l_up_term +1;
-    -- INSERT INTO xx_eccma_update_terms VALUES (l_term_id,
-		-- 											l_cursor.term_id,
-		-- 											CAST (l_cursor.term_is_deprecated AS BOOLEAN),
-		-- 											l_cursor.term_content);
-		 ELSE
-       l_up_term := l_up_term + 1;
-     /*
-     UPDATE terminologicals t
-        SET is_deprecated =  u.is_deprecated,
-              content     =  u.content,
-              updated_at  =  current_timestamp
-     FROM  xx_eccma_update_terms u
-      WHERE t.id = u.id;
-     */
-		 END IF;
 
 
 
-		   -- CREATE TABLE IF NOT EXISTS XX_ECCMA_CLASS AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-01#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_PROPERTY AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-02#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_FEATURE AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-03#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_REPRESENTATION AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-04#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_UM AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-05#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_QM AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-06#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_PROPERTY_VALUE AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-07#1';
 
-  -- CREATE TABLE IF NOT EXISTS XX_ECCMA_CURRENCY AS
-  -- SELECT tmp1.*
-  --   FROM tmp1 LEFT JOIN terminologicals
-  --     ON eccma_eotd = tmp1.term_id
-  --  WHERE tmp1.concept_id =  '0161-1#CT-08#1';
+
+
+
+
+
+
+
+
+DO
+	begin
+	WITH
+	new_concept AS ( -- Nuevos conceptos
+		INSERT INTO concepts SELECT nextval('concepts_id_seq1'),
+																l_record.concept_id,           -- eccma
+																l_record.concept_is_deprecated,
+																current_timestamp,
+																current_timestamp,
+																l_record.concept_type_id
+		WHERE NOT EXISTS (SELECT eccma_eotd FROM concepts WHERE concepts.eccma_eotd = l_record.concept_id)
+		RETURNING id INTO con_id
+	),
+
+	new_terms AS ( -- Nuevos términos
+		INSERT INTO terminologicals (id,
+																 eccma_eotd,
+																 content,
+																 is_deprecated,
+																 concept_id,
+																 language_id,
+																 organization_id,
+																 created_at,
+																 updated_at
+																)
+																SELECT nextval('terminologicals_id_seq1'),
+																			 l_record.term_id,
+																			 l_record.term_content,
+																			 l_record.concept_is_deprecated,
+																			 con_id,
+																			 l_record.language_id,
+																			 l_org_id,
+																			 current_timestamp,
+																			 current_timestamp
+		WHERE NOT EXISTS (SELECT id
+												FROM terminologicals
+											 WHERE terminology_class = 'term'
+												 AND terminologicals.eccma_eotd = l_record.term_id)
+		RETURNING id INTO term_id
+	),
+
+	new_defs AS ( --Nuevas definiciones
+		INSERT INTO terminologicals (id)
+																SELECT nextval('terminologicals_id_seq1'),
+																			 l_record.definition_id,
+																			 l_record.language_id,
+																			 con_id,
+																			 l_org_id
+																			 CAST(l_record.definition_is_deprecated AS BOOLEAN),
+																			 l_record.definition_content,
+
+	)
+
+	end;

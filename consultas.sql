@@ -356,6 +356,166 @@ SELECT id, COUNT(1)
  GROUP BY id
  HAVING COUNT(1) > 1;
 
+SELECT *
+  FROM xx_eccma_update_defs;
+
+COPY (SELECT Tempo.*
+  FROM terminologicals T,
+       (SELECT id, COUNT(1)
+          FROM xx_eccma_update_defs
+         GROUP BY id
+        HAVING COUNT(1) > 1) U,
+       tmp1 Tempo
+ WHERE T.terminology_class = 'definition'
+  AND T.id = U.id
+  AND T.eccma_eotd = Tempo.definition_id
+ order by 2) TO '/home/angel/Escritorio/duplicated_definitions.csv' DELIMITER ',' CSV HEADER;
+
+-- Consulta para saber los conceptos que no están en la base de datos
+COPY (SELECT tmp.*
+      FROM tmp1 tmp
+      WHERE 1 = 1
+            AND NOT EXISTS(
+          SELECT *
+          FROM concepts con
+          WHERE con.eccma_eotd = tmp.concept_id
+      )
+) TO '/home/angel/Gitlab/scripts_kontenix/resultados/conceptos_no_existentes_en_kontenix.csv' DELIMITER ',' CSV HEADER;
+
+SELECT tmp.*
+ FROM tmp1 tmp
+ WHERE 1 = 1
+       AND NOT EXISTS(
+     SELECT *
+     FROM concepts con
+     WHERE con.eccma_eotd = tmp.concept_id);
+
+SELECT t.*
+  FROM terminologicals t
+ WHERE 1 = 1
+   AND terminology_class = 'definition'
+   AND eccma_eotd = '0161-1#DF-2929118#1'
+ LIMIT 100
+;
+
+
+SELECT eccma_eotd, COUNT(1)
+  FROM terminologicals
+ WHERE 1 = 1
+   AND terminology_class = 'term'
+   AND eccma_eotd IS NOT NULL
+ GROUP BY eccma_eotd
+HAVING COUNT(1) > 1
+     ;
+
+SELECT SUM(2)
+  FROM (SELECT eccma_eotd, COUNT(1)
+        FROM terminologicals
+        WHERE 1 = 1
+              AND terminology_class = 'term'
+              AND eccma_eotd IS NOT NULL
+        GROUP BY eccma_eotd
+        HAVING COUNT(1) > 1) A;
+
+SELECT COUNT(1)
+  FROM terminologicals
+ WHERE terminology_class = 'term';
+-- 2939415
+
+SELECT T.id
+  , T.eccma_eotd
+  , T.is_deprecated
+  , T.content
+  , T.concept_id
+  , T.language_id
+  , T.created_at
+  , T.organization_id
+  , C.eccma_eotd Concept_id_eccma
+  , CT.name concept_type_name
+FROM terminologicals T, concepts C, concept_types CT
+WHERE 1 = 1
+  AND terminology_class = 'term'
+  -- AND T.eccma_eotd = '0161-1#TM-2504729#1'
+  -- AND T.eccma_eotd = '0161-1#TM-2707007#1'
+  AND C.id = T.concept_id
+  AND C.concept_type_id = CT.id
+  --AND NOT EXISTS(SELECT concept_id FROM tmp1)
+;
+
+
+SELECT T.id
+     , T.eccma_eotd
+     , T.is_deprecated
+     , T.content
+     , T.concept_id
+     , T.language_id
+     , T.created_at
+     , T.organization_id
+     , C.eccma_eotd Concept_id_eccma
+     , CT.name concept_type_name
+  FROM terminologicals T, concepts C, concept_types CT
+ WHERE 1 = 1
+   -- AND T.eccma_eotd = '0161-1#TM-2504729#1'
+   AND T.eccma_eotd = '0161-1#TM-2707007#1'
+   AND C.id = T.concept_id
+   AND C.concept_type_id = CT.id
+      ;
+
+-- 0161-1#01-1101876#1  Concepto no existe en la base de datos de ECCMA, pero sí en la de KONTENIX
+-- 0161-1#01-043047#1
+
+SELECT *
+  FROM tmp1
+ WHERE term_id = '0161-1#TM-2504729#1';
+
+SELECT *
+  FROM terminologicals
+ WHERE terminology_class = 'abbreviation'
+   AND eccma_eotd = '0161-1#AB-011963#1';
+
+
+
+-- Cantidad de términos que hay en la base de datos Kontenix
+SELECT count(1)
+  FROM terminologicals
+ WHERE terminology_class = 'abbreviation';
+
+
+SELECT COUNT(1)
+  FROM (SELECT DISTINCT eccma_eotd from organizations) O
+ ORDER BY 1;
+
+
+SELECT con.eccma_eotd, COUNT(1) Repetidos
+  FROM (SELECT eccma_eotd FROM concepts) con
+ WHERE 1 = 1
+  GROUP BY eccma_eotd
+ HAVING COUNT(1) > 1;
+
+SELECT *
+  FROM concepts
+ WHERE eccma_eotd = '0161-1#00-001115#1';
+
+SELECT *
+  FROM concepts
+ WHERE concept_type_id NOT IN (1, 2, 3, 4, 5, 6, 7, 8, 9);
+
+SELECT C.*
+  FROM terminologicals T, concepts C
+ WHERE 1 = 1
+   AND terminology_class = 'term'
+   AND T.eccma_eotd = C.eccma_eotd
+ LIMIT 100
+     ;
+
+SELECT *
+  FROM concepts
+ WHERE eccma_eotd IS NULL;
+
+
+SELECT COUNT(1)
+  FROM concepts;
+
 select *
   from xx_eccma_update_defs
  WHERE 1 = 1
@@ -390,16 +550,16 @@ SELECT COUNT(1)
 
 WITH updated_rows AS (
   UPDATE terminologicals
-  SET is_deprecated = FALSE
-  WHERE id = 3034667
+     SET is_deprecated = FALSE
+   WHERE id = 3034667
   RETURNING updated_at
 )
 SELECT updated_at
-FROM updated_rows;
+  FROM updated_rows;
 
 
 UPDATE terminologicals
-  SET is_deprecated = FALSE
+   SET is_deprecated = FALSE
  WHERE id = 3034667;
 
 SELECT *
@@ -407,3 +567,7 @@ SELECT *
 
 
 
+SELECT *
+  FROM terminologicals
+ WHERE 1 = 1
+   AND created_at > (current_date - 1);
