@@ -90,6 +90,9 @@ SELECT current_time;
 SELECT COUNT(1)
   FROM concepts;
 
+SELECT COUNT(1)
+  FROM  tmp1;
+
 COPY (SELECT tmp1.*
       FROM tmp1
         LEFT JOIN terminologicals
@@ -172,7 +175,11 @@ create table tmp1
   nain text
 );
 
-COPY tmp1 from '/home/angel/Documentos/Kontenix/historial/concept_dn_dic.csv' delimiter ',' csv header ;
+COPY tmp1 from '/home/angel/Documentos/Kontenix/historial/concept_dn_dic.csv' delimiter ',' csv header;
+
+SELECT count(1)
+  FROM tmp1;
+
 
 select count(1)
   from concepts join terminologicals t on concepts.id = t.concept_id
@@ -220,10 +227,16 @@ select count(1)
   from tmp1;
 
 
-select count(1)
+select *
   from terminologicals
  where 1 = 1
-   and terminology_class = 'abbreviation';
+   and terminology_class = 'term'
+   and eccma_eotd IS NOT NULL
+   --and concept_id IS NOT NULL
+   --and orginator_reference IS NOT NULL
+   --and orginator_reference <> ''
+ limit 100
+;
 
 select count(1)
   from organizations;
@@ -422,25 +435,25 @@ SELECT COUNT(1)
  WHERE terminology_class = 'term';
 -- 2939415
 
-SELECT T.id
-  , T.eccma_eotd
-  , T.is_deprecated
-  , T.content
-  , T.concept_id
-  , T.language_id
-  , T.created_at
-  , T.organization_id
-  , C.eccma_eotd Concept_id_eccma
-  , CT.name concept_type_name
-FROM terminologicals T, concepts C, concept_types CT
-WHERE 1 = 1
-  AND terminology_class = 'term'
-  -- AND T.eccma_eotd = '0161-1#TM-2504729#1'
-  -- AND T.eccma_eotd = '0161-1#TM-2707007#1'
-  AND C.id = T.concept_id
-  AND C.concept_type_id = CT.id
-  --AND NOT EXISTS(SELECT concept_id FROM tmp1)
-;
+SELECT  T.id
+      , T.eccma_eotd
+      , T.is_deprecated
+      , T.content
+      , T.concept_id
+      , T.language_id
+      , T.created_at
+      , T.organization_id
+      , C.eccma_eotd Concept_id_eccma
+      , CT.name concept_type_name
+    FROM terminologicals T, concepts C, concept_types CT
+    WHERE 1 = 1
+      AND terminology_class = 'term'
+      -- AND T.eccma_eotd = '0161-1#TM-2504729#1'
+      -- AND T.eccma_eotd = '0161-1#TM-2707007#1'
+      AND C.id = T.concept_id
+      AND C.concept_type_id = CT.id
+      --AND NOT EXISTS(SELECT concept_id FROM tmp1)
+    ;
 
 
 SELECT T.id
@@ -571,3 +584,6 @@ SELECT *
   FROM terminologicals
  WHERE 1 = 1
    AND created_at > (current_date - 1);
+
+
+
