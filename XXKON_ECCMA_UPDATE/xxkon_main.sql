@@ -15,6 +15,12 @@ DECLARE
                                    ];
   c VARCHAR;
 BEGIN
+
+  raise notice 'Truncando tabla de log.';
+
+  TRUNCATE TABLE xx_eccma_update_log;
+
+  --// Ciclo principal donde se ejecutan los tipos de conceptos
   FOREACH c IN ARRAY concepts_types LOOP
     PERFORM xxkon_fn_update_eccma_eotd(c);
   end loop;
