@@ -20,13 +20,14 @@ DECLARE
 BEGIN
   raise notice '%', p_text;
 
-  INSERT INTO xx_eccma_update_log VALUES (nextval('log_seq'), now(), p_text);
+  INSERT INTO xx_eccma_update_log(id, date_log, message_log) VALUES (nextval('log_seq'), current_timestamp, p_text);
 EXCEPTION
   WHEN OTHERS THEN
-    raise notice 'Ha ocurrido un error al tratar de registrar el log, contexto: %, %', p_concept_eccma_eotd, p_text;
+    raise notice 'Ha ocurrido un error al tratar de registrar el log: %', p_text;
 END;
 $$ LANGUAGE plpgsql;
 -------------------------------------------------------------------------------------------------------
+
 DROP FUNCTION xx_fn_log(p_concept_eccma_eotd VARCHAR(50), p_text VARCHAR(200));
 
 
