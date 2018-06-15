@@ -587,3 +587,5 @@ SELECT *
 
 
 
+-- Deshabilitar trigger
+alter table terminologicals disable trigger terminologicals_before_insert_update_row_tr;
