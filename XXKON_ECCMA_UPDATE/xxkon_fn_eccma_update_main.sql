@@ -75,7 +75,6 @@ BEGIN
   TRUNCATE TABLE xx_eccma_update_defs;
   TRUNCATE TABLE xx_eccma_update_abbr;
 
-
   -- Crea la tabla de donde se obtendrá la información en base a un concept type id
   DROP TABLE IF EXISTS XX_ECCMA_DATA_FROM_TMP;
   PERFORM xx_fn_log('Borrando tabla XX_ECCMA_DATA_FROM_TMP');
@@ -84,7 +83,7 @@ BEGIN
   --// Crea otra tabla temporal para aumentar el performance
   CREATE TABLE IF NOT EXISTS tmp2 AS
     SELECT tmp.*
-      , con.id id_concept
+         , con.id id_concept
     FROM tmp1 tmp
       JOIN concepts con ON con.eccma_eotd = tmp.concept_id
   ;
@@ -140,7 +139,7 @@ BEGIN
         updated_at = current_timestamp
       FROM upsert_data
       WHERE concepts.eccma_eotd = upsert_data.concept_id
-            AND concepts.is_deprecated <> CAST (upsert_data.concept_is_deprecated AS BOOLEAN)
+        AND concepts.is_deprecated <> CAST (upsert_data.concept_is_deprecated AS BOOLEAN)
       --RETURNING 'update concept'::text AS action, concept_id
       RETURNING  concept_id
       --RETURNING id INTO l_concept_id
@@ -468,10 +467,12 @@ BEGIN
   PERFORM xx_fn_log('Tabla xx_eccma_new_rows, borrada y creada para el tipo de concepto: ' || now());
 
 
-  FOR l_record IN (SELECT * FROM xx_eccma_new_rows WHERE concept_type_id <> '') LOOP
+  FOR l_record IN (SELECT *
+                     FROM xx_eccma_new_rows
+                    WHERE length(concept_type_id) > 0 ) LOOP
 
     CASE
-      WHEN l_record.concept_type_id <> '' OR l_record.concept_type_id IS NOT NULL OR l_record.concept_type_id <> 'NULL' OR length(l_record.concept_type_id) > 0 THEN l_approve_contype := TRUE;
+      WHEN (l_record.concept_type_id <> '' OR l_record.concept_type_id IS NOT NULL OR l_record.concept_type_id <> 'NULL' OR length(l_record.concept_type_id) > 0) THEN l_approve_contype := TRUE;
     END CASE;
 
     IF l_approve_contype THEN
@@ -510,7 +511,7 @@ BEGIN
     IF l_concept_type_id <> 0 THEN
       --// Validación si el concepto ya está en la base de datos de Kontenix
       BEGIN
-        SELECT id
+        SELECT STRICT id
         INTO l_concept_id
         FROM concepts
         WHERE eccma_eotd = l_record.concept_id;
@@ -796,6 +797,9 @@ BEGIN
   --// =================================================================================================================
 
   --// Datos que se van a actualizar
+
+  PERFORM xx_fn_log('Conceptos actualizados: ' || l_upd_concepts);
+
   l_log_text := 'Términos actualizados: ' || l_upd_terms;
   PERFORM xx_fn_log(l_log_text);
 
@@ -829,10 +833,6 @@ BEGIN
   PERFORM xx_fn_log('Abreviaciones agregadas: ' || l_new_abbr);
 
   PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || now());
-
-
-
-  PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || current_timestamp);
 
   EXCEPTION
   WHEN OTHERS THEN

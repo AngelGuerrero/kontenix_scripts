@@ -589,3 +589,26 @@ SELECT *
 
 -- Deshabilitar trigger
 alter table terminologicals disable trigger terminologicals_before_insert_update_row_tr;
+
+
+SELECT COUNT(1)
+  FROM concepts
+ WHERE created_at > (current_date - 1);
+
+SELECT *
+ FROM concept_types;
+
+DELETE FROM terminologicals
+ WHERE  1 =1
+  and ID IN (SELECT ID from terminologicals where created_at > (current_date - 1));
+
+
+SELECT COUNT(1)
+FROM (
+SELECT DISTINCT concept_id
+  FROM terminologicals
+ WHERE terminology_class = 'term'
+  AND concept_id IS NOT NULL) A
+;
+
+SELECT COUNT(1) FROM tmp1;
