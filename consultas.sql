@@ -369,9 +369,6 @@ SELECT id, COUNT(1)
  GROUP BY id
  HAVING COUNT(1) > 1;
 
-SELECT *
-  FROM xx_eccma_update_defs;
-
 COPY (SELECT Tempo.*
   FROM terminologicals T,
        (SELECT id, COUNT(1)

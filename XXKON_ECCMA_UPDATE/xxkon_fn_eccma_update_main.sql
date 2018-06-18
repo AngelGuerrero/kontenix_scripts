@@ -1,7 +1,6 @@
 /*===============================================================+
 PROCEDURE:     XXKON_FN_UPDATE_ECCMA_EOTD
 DESCRIPTION:   Procedimiento para actualizar eOTD general.
-ARGUMENTS:     '' "Tipo de concepto de eccma"
 RETURNS:       Void
 
 NOTES:         Script para realizar una actualización de registros en el eOTD
@@ -38,8 +37,8 @@ DECLARE
   l_new_abbr INTEGER DEFAULT 0; -- Nuevas abreviaciones insertadas
   l_upd_abbr INTEGER DEFAULT 0; -- Abreviaciones actualizadas
 
-  l_new_languages INTEGER DEFAULT 0;
-  l_new_conceptypes INTEGER DEFAULT 0; -- Nuevos tipos de conceptos
+  l_new_languages     INTEGER DEFAULT 0;
+  l_new_conceptypes   INTEGER DEFAULT 0; -- Nuevos tipos de conceptos
   l_new_organizations INTEGER DEFAULT 0;
 
 
@@ -64,12 +63,13 @@ DECLARE
   l_approve_contype BOOLEAN DEFAULT FALSE;
 
   _c text;
-BEGIN
-  raise notice 'Iniciando proceso de actualización hora: %', current_timestamp;
 
-  raise notice 'Truncando xx_eccma_update_terms';
-  raise notice 'Truncando xx_eccma_update_definition';
-  raise notice 'Truncando xx_eccma_update_abbr';
+  l_count_tmp    INTEGER;
+BEGIN
+  raise notice 'Iniciando proceso de actualización. Hora: %', current_timestamp;
+  raise notice 'Truncando tabla xx_eccma_update_terms';
+  raise notice 'Truncando tabla xx_eccma_update_definition';
+  raise notice 'Truncando tabla xx_eccma_update_abbr';
 
   TRUNCATE TABLE xx_eccma_update_terms;
   TRUNCATE TABLE xx_eccma_update_defs;
@@ -83,39 +83,58 @@ BEGIN
   --// Crea otra tabla temporal para aumentar el performance
   CREATE TABLE IF NOT EXISTS tmp2 AS
     SELECT tmp.*
-         , con.id id_concept
-    FROM tmp1 tmp
+           ,con.id id_concept
+      FROM tmp1 tmp
       JOIN concepts con ON con.eccma_eotd = tmp.concept_id
   ;
+  PERFORM xx_fn_log('Tabla tmp2 creada');
+
+  SELECT COUNT(1)
+    INTO l_count_tmp
+	FROM tmp2;
+
+  IF l_count_tmp = 0 THEN
+     PERFORM xx_fn_log('Tabla tmp2 vacia... Saliendo del proceso');
+     RETURN;
+  END IF;
 
   --//
   --// Pone la información de la tabla tmp1 en otra tabla temporal
   --// esto es porque la información irá aumentando
+  PERFORM xx_fn_log('Creando tabla XX_ECCMA_DATA_FROM_TMP');
+
   CREATE TABLE IF NOT EXISTS XX_ECCMA_DATA_FROM_TMP AS
-    SELECT tmp.*
-      , org1.eccma_eotd eccma_eotd_org_term
-      , org1.id id_org_term
-      , org2.eccma_eotd eccma_eotd_org_definition
-      , org2.id id_org_definition
-      , org3.eccma_eotd eccma_eotd_org_abbreviation
-      , org3.id id_org_abbreviation
-      , lan.id id_language
-      , lan.eccma_eotd eccma_eotd_language
-      , ct.id id_concept_type
-      , ct.eccma_eotd eccma_eotd_concept_type
-      , t1.id id_term
-      , t1.eccma_eotd eccma_eotd_term
-      , t1.is_deprecated eccma_eotd_is_dep_term
-      , t1.content eccma_eotd_content_term
-      , t2.id id_definition
-      , t2.eccma_eotd eccma_eotd_definition
-      , t2.is_deprecated eccma_eotd_is_dep_definition
-      , t2.content eccma_eotd_content_definition
-      , t3.id id_abbreviation
-      , t3.eccma_eotd eccma_eotd_abbreviation
-      , t3.is_deprecated eccma_eotd_is_dep_abbreviation
-      , t3.content eccma_eotd_content_abbreviation
-    FROM tmp2 tmp
+     SELECT tmp.*
+		    , org1.eccma_eotd eccma_eotd_org_term
+			, org1.id id_org_term
+			----------------------------------------------------
+			, org2.eccma_eotd eccma_eotd_org_definition
+			, org2.id id_org_definition
+			----------------------------------------------------
+			, org3.eccma_eotd eccma_eotd_org_abbreviation
+			, org3.id id_org_abbreviation
+			----------------------------------------------------
+			, lan.id id_language
+			, lan.eccma_eotd eccma_eotd_language
+			----------------------------------------------------
+			, ct.id id_concept_type
+			, ct.eccma_eotd eccma_eotd_concept_type
+			----------------------------------------------------
+			, t1.id id_term
+			, t1.eccma_eotd eccma_eotd_term
+			, t1.is_deprecated eccma_eotd_is_dep_term
+			, t1.content eccma_eotd_content_term
+			----------------------------------------------------
+			, t2.id id_definition
+			, t2.eccma_eotd eccma_eotd_definition
+			, t2.is_deprecated eccma_eotd_is_dep_definition
+			, t2.content eccma_eotd_content_definition
+			----------------------------------------------------
+			, t3.id id_abbreviation
+			, t3.eccma_eotd eccma_eotd_abbreviation
+			, t3.is_deprecated eccma_eotd_is_dep_abbreviation
+			, t3.content eccma_eotd_content_abbreviation
+      FROM tmp2 tmp
       LEFT JOIN organizations org1 ON org1.eccma_eotd = tmp.term_organization_id
       LEFT JOIN organizations org2 ON org2.eccma_eotd = tmp.definition_organization_id
       LEFT JOIN organizations org3 ON org3.eccma_eotd = tmp.abbreviation_organization_id
@@ -123,121 +142,181 @@ BEGIN
       LEFT JOIN concept_types ct   ON ct.eccma_eotd = tmp.concept_type_id
       LEFT JOIN terminologicals t1 on tmp.term_id = t1.eccma_eotd AND t1.terminology_class = 'term'
       LEFT JOIN terminologicals t2 ON tmp.definition_id = t2.eccma_eotd AND t2.terminology_class = 'definition'
-      LEFT JOIN terminologicals t3 ON tmp.abbreviation_id = t3.eccma_eotd AND t3.terminology_class = 'abbreviation'
-  ;
+      LEFT JOIN terminologicals t3 ON tmp.abbreviation_id = t3.eccma_eotd AND t3.terminology_class = 'abbreviation';
 
-
-  PERFORM xx_fn_log('Tabla XX_ECCMA_DATA_FROM_TMP creada');
-
+  PERFORM xx_fn_log('Actualizando conceptos existentes...');
   -- a) Actualiza los conceptos ya existentes de forma masiva
   WITH upsert_data AS (
       SELECT * from tmp1
-  ),
+      ),
       update_concept AS (
       UPDATE concepts
-      SET is_deprecated =  CAST (upsert_data.concept_is_deprecated AS BOOLEAN),
-        updated_at = current_timestamp
-      FROM upsert_data
-      WHERE concepts.eccma_eotd = upsert_data.concept_id
-        AND concepts.is_deprecated <> CAST (upsert_data.concept_is_deprecated AS BOOLEAN)
-      --RETURNING 'update concept'::text AS action, concept_id
+         SET is_deprecated =  CAST (upsert_data.concept_is_deprecated AS BOOLEAN),
+             updated_at = current_timestamp
+        FROM upsert_data
+       WHERE concepts.eccma_eotd = upsert_data.concept_id
+         AND concepts.is_deprecated <> CAST (upsert_data.concept_is_deprecated AS BOOLEAN)
       RETURNING  concept_id
-      --RETURNING id INTO l_concept_id
     )
-  SELECT COUNT(1) INTO l_upd_concepts FROM update_concept;
+  SELECT COUNT(1)
+    INTO l_upd_concepts
+	FROM update_concept;
 
+  PERFORM xx_fn_log('Ciclo de validacion para terminos, definiciones y abreviaciones - conceptos existentes...');
   -- 1) Ciclo para conceptos que si existen
-  FOR l_record IN (SELECT * FROM XX_ECCMA_DATA_FROM_TMP) LOOP
+  FOR l_record IN (SELECT * FROM XX_ECCMA_DATA_FROM_TMP)
+  LOOP
 
+  --------------------------------------------------------------------------------------------------------
+  --
+  --------------------------------------------------------------------------------------------------------
+    --HHH
+	--FALTARIA VALIDAR SI EL LANGUAGE NO EXISTE
+	IF LENGTH(l_record.language_id) >0 THEN
+      IF l_record.id_language IS NULL THEN
 
-    -- b) Validar la organización del término
-    -- Realiza primero la consulta para verificar que la organización exista.
-    IF (l_record.eccma_eotd_org_term IS NULL) THEN -- Significa que el término de la orgnización no existe, entonces la crea
-      l_log_text := 'Insertando la organización del término';
-      PERFORM xx_fn_log(l_log_text);
+	    BEGIN
+		   SELECT id
+		     INTO STRICT l_language_id
+		     FROM languages
+			WHERE eccma_eotd = l_record.language_id;
+	    EXCEPTION
+		   WHEN OTHERS THEN
+		      l_language_id := 0;
+		END;
 
-      INSERT INTO organizations VALUES (nextval('organizations_id_seq1'),-- Id
-                                        l_record.term_organization_id,   -- eccma_eotd
-                                        l_record.term_organization_name, -- name
-                                        NULL,                            -- mail_address
-                                        current_timestamp,                           -- created_at
-                                        current_timestamp                            -- updated_at
-      ) RETURNING id INTO l_org_id;
-      l_new_organizations := l_new_organizations + 1;
-    ELSE
-      l_org_id := l_record.id_org_term;
-    END IF;
+		IF l_language_id = 0 THEN
+		   INSERT INTO languages (id,
+								  eccma_eotd,
+								  country_code,
+								  name,
+								  description,
+								  code,
+								  created_at,
+								  updated_at)
+							VALUES(
+								  nextval('languages_id_seq1'),
+								  l_record.language_id,
+								  l_record.country_code,
+								  l_record.language_name,
+								  l_record.language_name,
+								  l_record.language_code,
+								  current_timestamp,
+								  current_timestamp
+								  )
+		   RETURNING id INTO l_language_id;
+		   l_new_languages := l_new_languages + 1;
+		END IF;
+      ELSE
+        l_language_id := l_record.id_language;
+      END IF;
+	END IF;
 
+	-- b) Validar la organización del término
+    --HHH 17 JUN 2018
+    -- ESTE IF NO ESTABA, FALTABA AGREGARLO
+    IF  length(l_record.term_organization_id) >0 THEN
+        l_org_id := l_record.id_org_term;
 
-    --// TÉRMINOS
-    IF (l_record.term_id <> '' OR l_record.term_id IS NOT NULL OR l_record.term_id <> 'NULL') THEN
-      IF (l_record.id_term IS NULL) THEN -- Si no se obtiene valores, se crea el nuevo término.
-        raise notice 'Insertando término en terminologicals';
-        INSERT INTO terminologicals (id,
-                                     terminology_class,
-                                     eccma_eotd,
-                                     content,
-                                     orginator_reference,
-                                     is_deprecated,
-                                     language_id,
-                                     organization_id,
-                                     term_id,
-                                     tsv_content,
-                                     concept_id,
-                                     created_at,
-                                     updated_at
-        )
-        VALUES
-          (nextval('terminologicals_id_seq1'),
-            'term',
-            l_record.term_id,
-            l_record.term_content,
-            l_record.term_originator_reference,
-            CAST(l_record.term_is_deprecated AS BOOLEAN),
-            l_record.id_language,
-            l_org_id,
-            NULL, --> term_id no se ocupa para el term
-            to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.term_content),'')),
-            l_record.id_concept,
-           current_timestamp,
-           current_timestamp
-          );
-        l_new_terms := l_new_terms + 1;
-      ELSE -- Actualiza entonces los términos, llena primero la tabla para los registros que serán actualizados
-        IF l_record.eccma_eotd_is_dep_term <> l_record.term_is_deprecated THEN
-          INSERT INTO xx_eccma_update_terms VALUES (l_record.id_term,
-                                                    CAST(l_record.term_is_deprecated AS BOOLEAN),
-                                                    l_record.term_content,
-                                                    l_record.term_id
-          );
-          l_upd_terms := l_upd_terms + 1;
+        IF l_org_id IS NULL THEN
+        --HHH IF COMENTADO PARA HOMOLOGAR CAMPO A VALIDAR SI ES NULO
+        --IF length(l_record.eccma_eotd_org_term) = 0 THEN
+        -- Significa que la organizacion del término no existe, entonces se crea
+
+        l_log_text := 'Insertando la organización del término';
+        --HHH
+        --PERFORM xx_fn_log(l_log_text);
+
+        INSERT INTO organizations VALUES (nextval('organizations_id_seq1'),-- Id
+                                          l_record.term_organization_id,   -- eccma_eotd
+                                          l_record.term_organization_name, -- name
+                                          NULL,                            -- mail_address
+                                          current_timestamp,                           -- created_at
+                                          current_timestamp                            -- updated_at
+                                          )
+        RETURNING id INTO l_org_id;
+        l_new_organizations := l_new_organizations + 1;
+
+      --HHH COMENTADO, ESTA DEMAS EL ELSE
+      --ELSE
+      --  l_org_id := l_record.id_org_term;
+      END IF;
+      ------------------------------------------------------------------------------------------------------------
+
+      --// TÉRMINOS
+      IF length(l_record.term_id) > 0 THEN
+
+        IF l_record.id_term IS NULL THEN
+        -- Si no se obtiene valores, se crea el nuevo término.
+
+          raise notice 'Insertando término en terminologicals';
+          INSERT INTO terminologicals (id,
+                                       terminology_class,
+                                       eccma_eotd,
+                                       content,
+                                       orginator_reference,
+                                       is_deprecated,
+                                       language_id,
+                                       organization_id,
+                                       term_id,
+                                       tsv_content,
+                                       concept_id,
+                                       created_at,
+                                       updated_at)
+								 VALUES(
+									   nextval('terminologicals_id_seq1'),
+									   'term',
+									   l_record.term_id,
+									   l_record.term_content,
+									   l_record.term_originator_reference,
+									   CAST(l_record.term_is_deprecated AS BOOLEAN),
+									   l_language_id,
+									   l_org_id,
+									   NULL, --> term_id no se ocupa para el term
+									   to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.term_content),'')),
+									   l_record.id_concept,
+									   current_timestamp,
+									   current_timestamp
+									   );
+          l_new_terms := l_new_terms + 1;
+        ELSE -- Actualiza entonces los términos, llena primero la tabla para los registros que serán actualizados
+          IF l_record.eccma_eotd_is_dep_term <> l_record.term_is_deprecated THEN
+             INSERT INTO xx_eccma_update_terms VALUES (l_record.id_term,
+                                                       CAST(l_record.term_is_deprecated AS BOOLEAN),
+                                                       l_record.term_content,
+                                                       l_record.term_id
+                                                      );
+             l_upd_terms := l_upd_terms + 1;
+          END IF;
         END IF;
       END IF;
+    --HHH
     END IF;
 
+----------------------------------------------------------------------------------------------------------------------------
     -- d) Validar la organización de la definición (Existe o no la organización, si no, se crea, si existe, no se hace nada)
-    IF (l_record.definition_organization_id <> '' OR  l_record.definition_organization_id IS NOT NULL OR  l_record.definition_organization_id <> 'NULL') THEN
+    IF length(l_record.definition_organization_id) >0 THEN
 
       l_org_id := l_record.id_org_definition;
 
-      IF (l_org_id IS NULL) THEN
-        l_log_text := 'Insertando una nueva organización para la definición';
-        -- PERFORM xx_fn_log(l_log_text);
+      IF l_org_id IS NULL THEN
+         l_log_text := 'Insertando una nueva organización para la definición';
+         -- PERFORM xx_fn_log(l_log_text);
 
-        INSERT INTO organizations VALUES (nextval('organizations_id_seq1'),
-                                          l_record.definition_organization_id,
-                                          l_record.definition_organization_name,
-                                          NULL,
-                                          current_timestamp,
-                                          current_timestamp
-        )
-        RETURNING id INTO l_org_id;
-        l_new_organizations := l_new_organizations + 1;
+         INSERT INTO organizations VALUES (nextval('organizations_id_seq1'),
+                                           l_record.definition_organization_id,
+                                           l_record.definition_organization_name,
+                                           NULL,
+                                           current_timestamp,
+                                           current_timestamp
+                                          )
+         RETURNING id INTO l_org_id;
+         l_new_organizations := l_new_organizations + 1;
       END IF; -- Sólo realiza éste if para la definición de la organización
 
 
       --// DEFINICIONES
-      IF (l_record.definition_id <> '' OR l_record.definition_id IS NOT NULL OR l_record.definition_id <> 'NULL') THEN
+      IF length(l_record.definition_id) >0 THEN
 
         CASE
           WHEN l_record.definition_is_deprecated = '1' THEN l_def_is_deprecated := TRUE;
@@ -245,7 +324,7 @@ BEGIN
         ELSE l_def_is_deprecated := FALSE;
         END CASE;
 
-        IF (l_record.id_definition IS NULL) THEN -- Si no se obtiene valores, se crea una nueva definición.
+        IF l_record.id_definition IS NULL THEN -- Si no se obtiene valores, se crea una nueva definición.
 
           INSERT INTO terminologicals (id,
                                        terminology_class,
@@ -259,72 +338,66 @@ BEGIN
                                        tsv_content,
                                        concept_id,
                                        created_at,
-                                       updated_at
-          )
-          VALUES
-            (nextval('terminologicals_id_seq1'),
-              'definition',
-              l_record.definition_id,
-              l_record.definition_content,
-              l_record.definition_originator_reference,
-              l_def_is_deprecated,
-              l_record.id_language,
-              l_org_id,
-              NULL, --> No se ocupa term_id para definition
-              to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.definition_content),'')),
-              l_record.id_concept,
-             current_timestamp,
-             current_timestamp
-            );
+                                       updated_at)
+								 VALUES(
+									   nextval('terminologicals_id_seq1'),
+									   'definition',
+									   l_record.definition_id,
+									   l_record.definition_content,
+									   l_record.definition_originator_reference,
+									   l_def_is_deprecated,
+									   l_language_id,
+									   l_org_id,
+									   NULL, --> No se ocupa term_id para definition
+									   to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.definition_content),'')),
+									   l_record.id_concept,
+									   current_timestamp,
+									   current_timestamp
+									   );
 
           l_new_defs := l_new_defs + 1;
         ELSE
           IF l_record.eccma_eotd_is_dep_definition <> l_def_is_deprecated THEN
-            INSERT INTO xx_eccma_update_defs VALUES(l_record.id_definition,
-                                                    l_def_is_deprecated,
-                                                    l_record.definition_content,
-                                                    l_record.definition_id
-            ) RETURNING id INTO l_def_id;
-            l_upd_defs := l_upd_defs + 1;
-          --l_log_text := 'Definición a actualizar, id:' || l_def_id;
-          -- PERFORM xx_fn_log(l_log_text);
-          end if;
-
+             INSERT INTO xx_eccma_update_defs VALUES(l_record.id_definition,
+                                                     l_def_is_deprecated,
+                                                     l_record.definition_content,
+                                                     l_record.definition_id
+                                                    );
+             --RETURNING id INTO l_def_id;
+             l_upd_defs := l_upd_defs + 1;
+          END IF;
         END IF;
       END IF;
-    END IF; -- Cierre end if de definiciones_organizaciones
+    END IF; -- Cierre end if de organization_definition
 
     --F) VALIDAR ORGANIZACIONES DE ABREVIACIONES(EXISTE O NO. SI NO EXISTE SE CREA. SI EXISTE NO SE HACE NADA)
-    IF (l_record.abbreviation_id <> '' OR l_record.abbreviation_id IS NOT NULL OR l_record.abbreviation_id <> 'NULL') THEN
 
+    IF length(l_record.abbreviation_id) >0 THEN
       l_org_id := l_record.id_org_abbreviation;
 
-      IF (l_record.abbreviation_organization_id <> ''       OR
-          l_record.abbreviation_organization_id IS NOT NULL OR
-          l_record.abbreviation_organization_id <> 'NULL') THEN
+      IF length(l_record.abbreviation_organization_id) >0 THEN
 
-        IF (l_org_id IS NULL) THEN
-          l_log_text := 'Insertando una nueva organización para la abreviación';
-          -- PERFORM xx_fn_log(l_log_text);
+        IF l_org_id IS NULL THEN
+           l_log_text := 'Insertando una nueva organización para la abreviación';
+           -- PERFORM xx_fn_log(l_log_text);
 
-          INSERT INTO organizations(id,
-                                    eccma_eotd,
-                                    name,
-                                    mail_address,
-                                    created_at,
-                                    updated_at
-          ) VALUES (
-            nextval('organizations_id_seq1'),
-            l_record.abbreviation_organization_id,
-            l_record.abbreviation_organization_name,
-            NULL,
-            current_timestamp,
-            current_timestamp
-          )
-          RETURNING id INTO l_org_id;
-          l_new_organizations := l_new_organizations + 1;
+           INSERT INTO organizations(id,
+                                     eccma_eotd,
+                                     name,
+                                     mail_address,
+                                     created_at,
+                                     updated_at)
+							   VALUES(
+								     nextval('organizations_id_seq1'),
+									 l_record.abbreviation_organization_id,
+									 l_record.abbreviation_organization_name,
+									 NULL,
+									 current_timestamp,
+									 current_timestamp
+									 )
+           RETURNING id INTO l_org_id;
+           l_new_organizations := l_new_organizations + 1;
         END IF;
-
       END IF;
 
       CASE
@@ -334,7 +407,7 @@ BEGIN
       END CASE;
 
       --// Si no está la abreviación entonces la agrega
-      IF (l_record.id_abbreviation IS NULL) THEN
+      IF l_record.id_abbreviation IS NULL THEN
         l_log_text := 'Insertando una nueva abreviación';
         -- PERFORM xx_fn_log(l_log_text);
 
@@ -350,41 +423,36 @@ BEGIN
                                        tsv_content,
                                        orginator_reference,
                                        created_at,
-                                       updated_at
-          ) VALUES (
-            nextval('terminologicals_id_seq1'),
-            'abbreviation',
-            l_record.abbreviation_id,
-            l_record.id_term,
-            l_record.abbreviation_content,
-            l_abbr_is_deprecated,
-            l_record.id_language,
-            l_org_id,
-            to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.abbreviation_content),'')),
-            l_record.abbreviation_originator_ref,
-            current_timestamp,
-            current_timestamp
-          );
+                                       updated_at)
+								 VALUES(
+									    nextval('terminologicals_id_seq1'),
+									    'abbreviation',
+									    l_record.abbreviation_id,
+									    l_record.id_term,
+									    l_record.abbreviation_content,
+									    l_abbr_is_deprecated,
+									    l_language_id,
+									    l_org_id,
+									    to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.abbreviation_content),'')),
+									    l_record.abbreviation_originator_ref,
+									    current_timestamp,
+									    current_timestamp
+									    );
           l_new_abbr := l_new_abbr + 1;
           EXCEPTION
-          WHEN OTHERS THEN
-            GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
-            raise notice 'details: >>%<<', _c;
+             WHEN OTHERS THEN
+                GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+                raise notice 'details: >>%<<', _c;
         END;
       ELSE
         IF l_record.eccma_eotd_is_dep_abbreviation <> l_abbr_is_deprecated THEN
-          INSERT INTO xx_eccma_update_abbr VALUES (l_record.id_abbreviation,
-                                                   l_abbr_is_deprecated,
-                                                   l_record.abbreviation_content)
-          RETURNING id INTO l_abbvr_id;
-
-          --l_log_text := 'Abreviación a actualizar: ' || l_abbvr_id;
-          --PERFORM xx_fn_log(l_log_text);
-
-          l_upd_abbr := l_upd_abbr + 1;
-        end if;
+           INSERT INTO xx_eccma_update_abbr VALUES (l_record.id_abbreviation,
+                                                    l_abbr_is_deprecated,
+                                                    l_record.abbreviation_content);
+           --RETURNING id INTO l_abbvr_id;
+           l_upd_abbr := l_upd_abbr + 1;
+        END IF;
       END IF;
-
     END IF;
   END LOOP;
 
@@ -394,12 +462,12 @@ BEGIN
   PERFORM xx_fn_log(l_log_text);
 
   UPDATE terminologicals t
-  SET is_deprecated = u.is_deprecated,
-    --content = u.content,
-    --tsv_content = to_tsvector('pg_catalog.simple', coalesce(unaccent(u.content),'')),
-    updated_at = current_timestamp
-  FROM xx_eccma_update_terms u
-  WHERE t.id = u.id;
+     SET is_deprecated = u.is_deprecated,
+         --content = u.content,
+         --tsv_content = to_tsvector('pg_catalog.simple', coalesce(unaccent(u.content),'')),
+         updated_at = current_timestamp
+    FROM xx_eccma_update_terms u
+   WHERE t.id = u.id;
 
 
   --//
@@ -408,12 +476,12 @@ BEGIN
   PERFORM xx_fn_log(l_log_text);
 
   UPDATE terminologicals t
-  SET is_deprecated = u.is_deprecated,
-    --content = u.content,
-    --tsv_content = to_tsvector('pg_catalog.simple', coalesce(unaccent(u.content),'')),
-    updated_at = current_timestamp
-  FROM xx_eccma_update_defs u
-  WHERE t.id = u.id;
+     SET is_deprecated = u.is_deprecated,
+         --content = u.content,
+         --tsv_content = to_tsvector('pg_catalog.simple', coalesce(unaccent(u.content),'')),
+         updated_at = current_timestamp
+    FROM xx_eccma_update_defs u
+   WHERE t.id = u.id;
 
 
   --//
@@ -422,15 +490,14 @@ BEGIN
   PERFORM xx_fn_log(l_log_text);
 
   UPDATE terminologicals t
-  SET is_deprecated = u.is_deprecated,
-    --content = u.content,
-    --tsv_content = to_tsvector('pg_catalog.simple', coalesce(unaccent(u.content),'')),
-    updated_at = current_timestamp
-  FROM xx_eccma_update_abbr u
-  WHERE t.id = u.id;
+     SET is_deprecated = u.is_deprecated,
+         --content = u.content,
+         --tsv_content = to_tsvector('pg_catalog.simple', coalesce(unaccent(u.content),'')),
+         updated_at = current_timestamp
+    FROM xx_eccma_update_abbr u
+   WHERE t.id = u.id;
 
   raise notice '================================================================================';
-
 
   --// =================================================================================================================
   --// Inicia con la inserción de nuevos conceptos, términos, definiciones y abreviaciones, etc.
@@ -445,45 +512,45 @@ BEGIN
 
   CREATE TABLE IF NOT EXISTS xx_eccma_new_rows AS (
     SELECT tmp.*
-      , org1.eccma_eotd eccma_eotd_org_term
-      , org1.id id_org_term
-      , org2.eccma_eotd eccma_eotd_org_definition
-      , org2.id id_org_definition
-      , org3.eccma_eotd eccma_eotd_org_abbreviation
-      , org3.id id_org_abbreviation
-      , lan.id id_language
-      , lan.eccma_eotd eccma_eotd_language
-      , ct.id id_concept_type
-      , ct.eccma_eotd eccma_eotd_concept_type
-    FROM tmp1 tmp
-      LEFT JOIN organizations org1 ON org1.eccma_eotd = tmp.term_organization_id
-      LEFT JOIN organizations org2 ON org2.eccma_eotd = tmp.definition_organization_id
-      LEFT JOIN organizations org3 ON org3.eccma_eotd = tmp.abbreviation_organization_id
-      LEFT JOIN languages lan      ON lan.eccma_eotd = tmp.language_id
-      LEFT JOIN concept_types ct   ON ct.eccma_eotd = tmp.concept_type_id
-    WHERE NOT exists(select 1 FROM concepts con where con.eccma_eotd = tmp.concept_id)
+        , org1.eccma_eotd eccma_eotd_org_term
+        , org1.id id_org_term
+        , org2.eccma_eotd eccma_eotd_org_definition
+        , org2.id id_org_definition
+        , org3.eccma_eotd eccma_eotd_org_abbreviation
+        , org3.id id_org_abbreviation
+        , lan.id id_language
+        , lan.eccma_eotd eccma_eotd_language
+        , ct.id id_concept_type
+        , ct.eccma_eotd eccma_eotd_concept_type
+     FROM tmp1 tmp
+     LEFT JOIN organizations org1 ON org1.eccma_eotd = tmp.term_organization_id
+     LEFT JOIN organizations org2 ON org2.eccma_eotd = tmp.definition_organization_id
+     LEFT JOIN organizations org3 ON org3.eccma_eotd = tmp.abbreviation_organization_id
+     LEFT JOIN languages lan      ON lan.eccma_eotd = tmp.language_id
+     LEFT JOIN concept_types ct   ON ct.eccma_eotd = tmp.concept_type_id
+    WHERE NOT EXISTS(SELECT 1 FROM concepts con WHERE con.eccma_eotd = tmp.concept_id)
   );
 
   PERFORM xx_fn_log('Tabla xx_eccma_new_rows, borrada y creada para el tipo de concepto: ' || now());
 
-
   FOR l_record IN (SELECT *
                      FROM xx_eccma_new_rows
-                    WHERE length(concept_type_id) > 0 ) LOOP
+                    WHERE length(concept_type_id) > 0 )
+  LOOP
 
-    CASE
-      WHEN (l_record.concept_type_id <> '' OR l_record.concept_type_id IS NOT NULL OR l_record.concept_type_id <> 'NULL' OR length(l_record.concept_type_id) > 0) THEN l_approve_contype := TRUE;
-    END CASE;
+    --CASE
+    --  WHEN length(l_record.concept_type_id) >0 THEN l_approve_contype := TRUE;
+    --END CASE;
 
-    IF l_approve_contype THEN
+    IF length(l_record.concept_type_id) >0 THEN
 
       BEGIN
         SELECT id
-        INTO STRICT l_concept_type_id
-        FROM concept_types
-        WHERE concept_types.eccma_eotd = l_record.concept_type_id;
+          INTO STRICT l_concept_type_id
+          FROM concept_types
+         WHERE concept_types.eccma_eotd = l_record.concept_type_id;
 
-        EXCEPTION
+      EXCEPTION
         WHEN NO_DATA_FOUND THEN
           l_concept_type_id := 0;
         WHEN OTHERS THEN
@@ -508,16 +575,16 @@ BEGIN
 
     --// ===============================================================================================================
 
-    IF l_concept_type_id <> 0 THEN
+    IF l_concept_type_id > 0 THEN
       --// Validación si el concepto ya está en la base de datos de Kontenix
       BEGIN
-        SELECT STRICT id
-        INTO l_concept_id
-        FROM concepts
-        WHERE eccma_eotd = l_record.concept_id;
-        EXCEPTION
-        WHEN OTHERS THEN
-          l_concept_id := 0;
+        SELECT id
+          INTO STRICT l_concept_id
+          FROM concepts
+         WHERE eccma_eotd = l_record.concept_id;
+      EXCEPTION
+         WHEN OTHERS THEN
+            l_concept_id := 0;
       END;
 
       CASE
@@ -527,31 +594,28 @@ BEGIN
       END CASE;
 
       IF l_concept_id = 0 THEN
-        INSERT INTO concepts (id,
-                              eccma_eotd,
-                              is_deprecated,
-                              created_at,
-                              updated_at,
-                              concept_type_id
-        )
-          SELECT nextval('concepts_id_seq1'),
-            l_record.concept_id,
-            l_con_is_deprecated,
-            current_timestamp,
-            current_timestamp,
-            l_concept_type_id
-        RETURNING id INTO l_concept_id; --// Obtiene el concept_id que acaba de insertar
-
+         INSERT INTO concepts (id,
+                               eccma_eotd,
+                               is_deprecated,
+                               created_at,
+                               updated_at,
+                               concept_type_id)
+					     VALUES(
+						       nextval('concepts_id_seq1'),
+							   l_record.concept_id,
+							   l_con_is_deprecated,
+							   current_timestamp,
+							   current_timestamp,
+							   l_concept_type_id
+						       )
+        RETURNING id INTO l_concept_id;
         l_new_concepts := l_new_concepts + 1;
       END IF;
-
-
-
 
       --// ===============================================================================================================
       --// NUEVOS TÉRMINOS
 
-      l_log_text := 'Insertando un nuevo término: ' || l_record.term_id;
+      l_log_text := 'Insertando nuevo término: ' || l_record.term_id;
 
       --//
       --// Validación de language
@@ -564,15 +628,16 @@ BEGIN
                                code,
                                created_at,
                                updated_at)
-        VALUES
-          (nextval('languages_id_seq1'),
-           l_record.language_id,
-           l_record.country_code,
-           l_record.language_name,
-           l_record.language_name,
-           l_record.language_code,
-           current_timestamp,
-           current_timestamp)
+						VALUES(
+							  nextval('languages_id_seq1'),
+							  l_record.language_id,
+							  l_record.country_code,
+							  l_record.language_name,
+							  l_record.language_name,
+							  l_record.language_code,
+							  current_timestamp,
+							  current_timestamp
+							  )
         RETURNING id INTO l_language_id;
         l_new_languages := l_new_languages + 1;
       ELSE
@@ -581,26 +646,24 @@ BEGIN
 
       --//
       --// Validar que el término no venga nulo, y que la organización exista
-      IF (l_record.term_id <> ''     OR
-          l_record.term_id <> 'NULL' OR
-          l_record.term_id IS NOT NULL) THEN
+      IF length(l_record.term_id) >0 THEN
 
-        IF l_record.eccma_eotd_org_term IS NULL THEN
+        IF length(l_record.eccma_eotd_org_term) = 0 THEN
           --// Valida el término de la organización
           INSERT INTO organizations(id,
                                     eccma_eotd,
                                     name,
                                     mail_address,
                                     created_at,
-                                    updated_at
-          )
-          VALUES (
-            nextval('organizations_id_seq1'),
-            l_record.term_organization_id,
-            l_record.term_organization_name,
-            NULL,
-            current_timestamp,
-            current_timestamp)
+                                    updated_at)
+							  VALUES(
+								    nextval('organizations_id_seq1'),
+								    l_record.term_organization_id,
+								    l_record.term_organization_name,
+								    NULL,
+								    current_timestamp,
+								    current_timestamp
+								    )
           RETURNING id INTO l_org_id;
           l_new_organizations := l_new_organizations + 1;
         ELSE
@@ -620,53 +683,48 @@ BEGIN
                                      tsv_content,
                                      concept_id,
                                      created_at,
-                                     updated_at
-        )
-        VALUES
-          (nextval('terminologicals_id_seq1'),
-            'term',
-            l_record.term_id,
-            l_record.term_content,
-            l_record.term_originator_reference,
-            CAST(l_record.term_is_deprecated AS BOOLEAN),
-            l_record.id_language,
-            l_org_id,
-            NULL, --> term_id no se ocupa para el term
-            to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.term_content),'')),
-            l_concept_id,
-           current_timestamp,
-           current_timestamp
-          )
+                                     updated_at)
+							   VALUES(
+								     nextval('terminologicals_id_seq1'),
+								     'term',
+								     l_record.term_id,
+								     l_record.term_content,
+								     l_record.term_originator_reference,
+								     CAST(l_record.term_is_deprecated AS BOOLEAN),
+								     l_record.id_language,
+								     l_org_id,
+								     NULL, --> term_id no se ocupa para el term
+								     to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.term_content),'')),
+								     l_concept_id,
+								     current_timestamp,
+								     current_timestamp
+								    )
         RETURNING id INTO l_term_id;
-
         l_new_terms := l_new_terms + 1;
       END IF;
 
       --// ===============================================================================================================
       --// NUEVAS DEFINICIONES
-
       --//
       --// Validar que la definición organización no venga nulo
-      IF (l_record.definition_id <> '' OR
-          l_record.definition_id <> 'NULL' OR
-          l_record.definition_id IS NOT NULL) THEN
+      IF length(l_record.definition_id) >0 THEN
 
-        IF l_record.eccma_eotd_org_definition IS NULL THEN
+        IF length(l_record.eccma_eotd_org_definition) = 0 THEN
           --// Valida la definición de la organización
           INSERT INTO organizations(id,
                                     eccma_eotd,
                                     name,
                                     mail_address,
                                     created_at,
-                                    updated_at
-          )
-            SELECT
-              nextval('organizations_id_seq1'),
-              l_record.definition_organization_id,
-              l_record.definition_organization_name,
-              NULL,
-              current_timestamp,
-              current_timestamp
+                                    updated_at)
+							 VALUES(
+								    nextval('organizations_id_seq1'),
+								    l_record.definition_organization_id,
+								    l_record.definition_organization_name,
+								    NULL,
+								    current_timestamp,
+								    current_timestamp
+								    )
           RETURNING id INTO l_org_id;
           l_new_organizations := l_new_organizations + 1;
         ELSE
@@ -691,52 +749,48 @@ BEGIN
                                      tsv_content,
                                      concept_id,
                                      created_at,
-                                     updated_at
-        )
-        VALUES
-          (nextval('terminologicals_id_seq1'),
-            'definition',
-            l_record.definition_id,
-            l_record.definition_content,
-            l_record.definition_originator_reference,
-            l_def_is_deprecated,
-            l_record.id_language,
-            l_org_id,
-            NULL, --> No se ocupa term_id para definition
-            to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.definition_content),'')),
-            l_concept_id,
-           current_timestamp,
-           current_timestamp
-          );
+                                     updated_at)
+							  VALUES(
+									 nextval('terminologicals_id_seq1'),
+									 'definition',
+									 l_record.definition_id,
+									 l_record.definition_content,
+									 l_record.definition_originator_reference,
+									 l_def_is_deprecated,
+									 l_record.id_language,
+									 l_org_id,
+									 NULL, --> No se ocupa term_id para definition
+									 to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.definition_content),'')),
+									 l_concept_id,
+									 current_timestamp,
+									 current_timestamp
+									 );
         l_new_defs := l_new_defs + 1;
       END IF;
 
       --// ===============================================================================================================
       --// NUEVAS ABREVIACIONES
-
       --//
       --// Validar que la abreviación organización esté creada
 
-      IF (l_record.abbreviation_id <> '' OR
-          l_record.abbreviation_id <> 'NULL' OR
-          l_record.abbreviation_id IS NOT NULL) THEN
+      IF length(l_record.abbreviation_id) >0 THEN
 
-        IF l_record.eccma_eotd_org_abbreviation IS NULL THEN
-          --// Valida la definición de la organización
+        IF length(l_record.eccma_eotd_org_abbreviation) = 0 THEN
+          --// Valida la existencia de la organizacion de la abreviacion
           INSERT INTO organizations(id,
                                     eccma_eotd,
                                     name,
                                     mail_address,
                                     created_at,
-                                    updated_at
-          )
-            SELECT
-              nextval('organizations_id_seq1'),
-              l_record.abbreviation_organization_id,
-              l_record.abbreviation_organization_name,
-              NULL,
-              current_timestamp,
-              current_timestamp
+                                    updated_at)
+							 VALUES(
+								    nextval('organizations_id_seq1'),
+								    l_record.abbreviation_organization_id,
+								    l_record.abbreviation_organization_name,
+								    NULL,
+								    current_timestamp,
+								    current_timestamp
+								    )
           RETURNING id INTO l_org_id;
           l_new_organizations := l_new_organizations + 1;
         ELSE
@@ -763,22 +817,22 @@ BEGIN
                                        tsv_content,
                                        concept_id,
                                        created_at,
-                                       updated_at
-          ) VALUES (
-            nextval('terminologicals_id_seq1'),
-            'abbreviation',
-            l_record.abbreviation_id,
-            l_record.abbreviation_content,
-            l_record.abbreviation_originator_ref,
-            l_abbr_is_deprecated,
-            l_record.id_language,
-            l_org_id,
-            l_record.id_term,
-            to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.abbreviation_content),'')),
-            NULL, --> No se ocupa el concept_id para la abreviación
-            current_timestamp,
-            current_timestamp
-          );
+                                       updated_at)
+                                 VALUES(
+									   nextval('terminologicals_id_seq1'),
+									   'abbreviation',
+									   l_record.abbreviation_id,
+									   l_record.abbreviation_content,
+									   l_record.abbreviation_originator_ref,
+									   l_abbr_is_deprecated,
+									   l_record.id_language,
+									   l_org_id,
+									   l_record.id_term,
+									   to_tsvector('pg_catalog.simple', coalesce(unaccent(l_record.abbreviation_content),'')),
+									   NULL, --> No se ocupa el concept_id para la abreviación
+									   current_timestamp,
+									   current_timestamp
+									   );
           EXCEPTION
           WHEN OTHERS THEN
             GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
@@ -787,18 +841,14 @@ BEGIN
         l_new_abbr := l_new_abbr + 1;
       END IF;
     END IF;
-
-
   END LOOP;
 
-
   raise notice '================================================================================';
-
   --// =================================================================================================================
-
   --// Datos que se van a actualizar
 
-  PERFORM xx_fn_log('Conceptos actualizados: ' || l_upd_concepts);
+  l_log_text := 'Conceptos actualizados: ' || l_upd_concepts;
+  PERFORM xx_fn_log(l_log_text);
 
   l_log_text := 'Términos actualizados: ' || l_upd_terms;
   PERFORM xx_fn_log(l_log_text);
@@ -835,11 +885,11 @@ BEGIN
   PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || now());
 
   EXCEPTION
-  WHEN OTHERS THEN
-    GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
-    RAISE NOTICE 'context: >>%<<', _c;
-    raise notice 'Ha ocurrido un error en la función: xxkon_fn_upate_eotd';
-    raise notice 'Error: % %', sqlstate, sqlerrm;
+     WHEN OTHERS THEN
+        GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
+        RAISE NOTICE 'context: >>%<<', _c;
+        raise notice 'Ha ocurrido un error en la función: xxkon_fn_upate_eotd';
+        raise notice 'Error: % %', sqlstate, sqlerrm;
 END;
 $$
 LANGUAGE plpgsql;
