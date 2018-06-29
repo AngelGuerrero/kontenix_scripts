@@ -29,7 +29,7 @@ DECLARE
   l_log_text VARCHAR(200);
   l_approve_contype BOOLEAN DEFAULT FALSE;
   _c text;
-  
+
   l_count_tmp    INTEGER;
 BEGIN
   PERFORM xx_fn_log('Iniciando proceso de actualización de conceptos existentes. Hora: ' || now());
@@ -44,20 +44,20 @@ BEGIN
   PERFORM xx_fn_log('Creando la Tabla xx_concepts');
   CREATE TABLE xx_concepts AS
     SELECT tmp.*
-           ,con.id id_concept
-      FROM tmp_dn tmp
+      ,con.id id_concept
+    FROM tmp_dn tmp
       JOIN concepts con ON con.eccma_eotd = tmp.concept_id;
-  
-  
+
+
   SELECT COUNT(1)
-    INTO l_count_tmp
+  INTO l_count_tmp
   FROM xx_concepts;
-  
+
   IF l_count_tmp = 0 THEN
-     PERFORM xx_fn_log('Tabla xx_concepts vacia... Saliendo del proceso');
-     RETURN;
+    PERFORM xx_fn_log('Tabla xx_concepts vacia... Saliendo del proceso');
+    RETURN;
   END IF;
-  
+
   --//
   --// Pone la información de la tabla tmp1 en otra tabla temporal
   --// esto es porque la información irá aumentando
@@ -78,8 +78,8 @@ BEGIN
          AND concepts.is_deprecated <> CAST (upsert_data.concept_is_deprecated AS BOOLEAN)
       RETURNING  id -- FIXUP: No existe la columna concept_id
     )
-  SELECT COUNT(1) 
-    INTO l_upd_concepts 
+  SELECT COUNT(1)
+  INTO l_upd_concepts
   FROM update_concept;
 
   raise notice '================================================================================';
