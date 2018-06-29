@@ -1,19 +1,16 @@
 /*===============================================================+
-PROCEDURE:     XXKON_FN_UPDATE_ECCMA_EOTD
-DESCRIPTION:   Procedimiento para actualizar eOTD general.
-RETURNS:       Void
+FILE:          01_xx_eccma_loop_exists_concepts
+DESCRIPTION:   Procedimiento anónimo para agregar términos, definiciones y
+               abreviaciones de los conceptos ya existentes.
 
-NOTES:         Script para realizar una actualización de registros en el eOTD
-               general, este script usa el principio que se había implementado en
-               Ruby, más sin embargo en vez de trabajar con archivos, trabaja con
-               tablas temporales, la tabla tmp1 es la tabla temporal donde se
-               encuentran los datos venidos de la India.
+RETURNS:       Void
 
 HISTORY
 Version     Date         Author                    Change Reference
 1.0    12/Junio/2018    Ángel Guerrero           Creación del script
                         Hebert Hernández
 +================================================================*/
+
 DO
 $$
 DECLARE
@@ -58,8 +55,9 @@ DECLARE
   l_approve_contype BOOLEAN DEFAULT FALSE;
 
   _c text;
-  
 BEGIN
+  PERFORM xx_fn_log('Iniciando proceso para agregar terminos, definiciones y abreviaciones de conceptos existentes. Hora: ' || now());
+  
   raise notice 'Iniciando proceso de actualización. Hora: %', current_timestamp;
   raise notice 'Truncando tabla xx_eccma_update_terms';
   raise notice 'Truncando tabla xx_eccma_update_definition';
@@ -163,7 +161,7 @@ BEGIN
   --// esto es porque la información irá aumentando
   PERFORM xx_fn_log('Creando tabla XX_ECCMA_DATA_FROM_TMP');
   
-  CREATE TABLE IF NOT EXISTS XX_ECCMA_DATA_FROM_TMP AS
+  CREATE TABLE XX_ECCMA_DATA_FROM_TMP AS
      SELECT tmp.*
         , org1.eccma_eotd eccma_eotd_org_term
       , org1.id id_org_term
@@ -396,55 +394,10 @@ BEGIN
     END IF;
   END LOOP;
 
-/*
-  --//
-  --// Realiza las actualizaciones de las tablas generadas temporalmente para los términos
-  l_log_text := 'Realizando update de los términos (eccma_update_terms) hora:' || current_timestamp;
-  PERFORM xx_fn_log(l_log_text);
-
-  UPDATE terminologicals t
-     SET is_deprecated = u.is_deprecated,
-         updated_at = current_timestamp
-    FROM xx_eccma_update_terms u
-   WHERE t.id = u.id;
-
-  --//
-  --// Realiza las actualizaciones de las tablas generadas temporalmente para las definiciones
-  l_log_text := 'Realizando update de las definiciones (eccma_update_defs) hora: ' || current_timestamp;
-  PERFORM xx_fn_log(l_log_text);
-
-  UPDATE terminologicals t
-     SET is_deprecated = u.is_deprecated,
-         updated_at = current_timestamp
-    FROM xx_eccma_update_defs u
-   WHERE t.id = u.id;
-
-  --//
-  --// Realiza las actualizaciones de las tablas generadas temporalmente para las abreviaciones
-  l_log_text := 'Realizando update de las abreviaciones (xx_eccma_update_abbr) hora: ' || current_timestamp;
-  PERFORM xx_fn_log(l_log_text);
-
-  UPDATE terminologicals t
-     SET is_deprecated = u.is_deprecated,
-         updated_at = current_timestamp
-    FROM xx_eccma_update_abbr u
-   WHERE t.id = u.id;
-*/
   raise notice '================================================================================';
   --// =================================================================================================================
-  --// Datos que se van a actualizar
-
-  l_log_text := 'Términos actualizados: ' || l_upd_terms;
-  PERFORM xx_fn_log(l_log_text);
-
-  l_log_text := 'Definiciones actualizadas: ' || l_upd_defs;
-  PERFORM xx_fn_log(l_log_text);
-
-  l_log_text := 'Abreviaciones actualizadas: ' || l_upd_abbr;
-  PERFORM xx_fn_log(l_log_text);
 
   --// Nuevos valores que se insertaron
-
   --// Obtiene la cifra de nuevos términos
   PERFORM xx_fn_log('Términos agregados: ' || l_new_terms);
 
@@ -454,13 +407,22 @@ BEGIN
   --// Obtiene la cifra de nuevas abreviaciones
   PERFORM xx_fn_log('Abreviaciones agregadas: ' || l_new_abbr);
 
-  PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || now());
+    --// Datos que se van a actualizar
+  raise notice '=== Cantidad de objetos que se actualizarán durante el tercer script. ===';
 
+  PERFORM xx_fn_log('Términos a actualizar: ' || l_upd_terms);
+
+  PERFORM xx_fn_log('Definiciones a actualizar: ' || l_upd_defs);
+
+  PERFORM xx_fn_log('Abreviaciones a actualizar: ' || l_upd_abbr);
+
+  PERFORM xx_fn_log('Segundo ciclo terminado correctamente, hora: ' || now());
+  
   EXCEPTION
      WHEN OTHERS THEN
         GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'context: >>%<<', _c;
-        raise notice 'Ha ocurrido un error en la función: xxkon_fn_upate_eotd';
+        raise notice 'Ha ocurrido un error en el script 02_xx_eccma_loop_exists_concepts';
         raise notice 'Error: % %', sqlstate, sqlerrm;
 END;
 $$

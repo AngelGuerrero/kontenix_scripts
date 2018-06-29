@@ -1,4 +1,7 @@
---// Funciones necesarias para realizar el procedimiento de actualización del eOTD
+--=============================================================================================================
+-- FUNCIONES Y CREACIONES DE OBJETOS QUE SE DEBEN DE REALIZAR UNA ÚNICA VEZ
+
+--// Tablas y funciones necesarias para realizar el procedimiento de actualización del eOTD
 
 CREATE TABLE IF NOT EXISTS xx_eccma_update_log (id INTEGER, date_log  TIMESTAMP, message_log varchar(500));
 CREATE TABLE IF NOT EXISTS xx_eccma_update_terms(id integer, is_deprecated boolean, content text, eccma_eotd varchar(20));
@@ -23,10 +26,9 @@ EXCEPTION
     raise notice 'Ha ocurrido un error al tratar de registrar el log: %', p_text;
 END;
 $$ LANGUAGE plpgsql;
--------------------------------------------------------------------------------------------------------
 
 --nueva tabla tmp_dn donde se almacena el dump de ecmma
-CREATE TABLE public.tmp_dn
+CREATE TABLE IF NOT EXISTS tmp_dn
 (
     term_id character varying(100) COLLATE pg_catalog."default",
     concept_id character varying(100) COLLATE pg_catalog."default",
@@ -92,35 +94,22 @@ WITH (
 )
 TABLESPACE pg_default;
 
-
 CREATE INDEX xx_tmp_dn_idx1 ON tmp_dn (concept_id);
 CREATE INDEX xx_tmp_dn_idx2 ON tmp_dn (definition_id);
 CREATE INDEX xx_tmp_dn_idx3 ON tmp_dn (abbreviation_id);
 
---despues de esto se debe de carga el archivo csv  en la tabla tmp_dn
---
+
+
+--=======================================================================
+-- ACTIVIDADES QUE SE DEBEN DE SEGUIR SI YA SE HAN REALIZADO LOS PASOS ANTERIORES ---
+
+-- Despues de esto se debe de carga el archivo csv  en la tabla tmp_dn
+-- es importante que tenga un slash al principio, esto por tema de permisos
+\COPY tmp_dn FROM '/home/ubuntu/concept_dn_19JUN_FULL.csv_10' DELIMITER ',' CSV;
+
 --DESHABILITAR TRIGGER EN TABLA TERMINOLOGICALS
+alter table terminologicals disable trigger terminologicals_before_insert_update_row_tr;
 
-VACUUM(FULL, ANALYZE) terminologicals;
-VACUUM(FULL, ANALYZE) concepts;
-VACUUM(FULL, ANALYZE) concept_types;
-
--------------------------------------------------------------------------------------------------------------------------
--------------------------------------------------------------------------------------------------------------------------
-DROP TABLE IF EXISTS xx_eccma_update_log;
-DROP TABLE IF EXISTS xx_eccma_update_terms;
-DROP TABLE IF EXISTS xx_eccma_update_defs;
-DROP TABLE IF EXISTS xx_eccma_update_abbr;
-
--------------------------------------------------------------------------------------------------------------------------
-
-
-select *
-from pg_stat_user_tables
-where relname = 'terminologicals';
-
---Let’s break the columns down:
---relname = the name of the table in question
---n_live_tup = the approximate number of live rows
---n_dead_tup = the approximate number of dead rows
-
+VACUUM(ANALYZE) terminologicals;
+VACUUM(ANALYZE) concepts;
+VACUUM(ANALYZE) concept_types;

@@ -1,13 +1,10 @@
 /*===============================================================+
-PROCEDURE:     XXKON_FN_UPDATE_ECCMA_EOTD
-DESCRIPTION:   Procedimiento para actualizar eOTD general.
+PROCEDURE:     04_xx_eccma_new_concepts
+DESCRIPTION:   Procedimiento anónimo para agregar todos los registros
+			   que no están en la base de Kontenix
+
 RETURNS:       Void
 
-NOTES:         Script para realizar una actualización de registros en el eOTD
-               general, este script usa el principio que se había implementado en
-               Ruby, más sin embargo en vez de trabajar con archivos, trabaja con
-               tablas temporales, la tabla tmp1 es la tabla temporal donde se
-               encuentran los datos venidos de la India.
 
 HISTORY
 Version     Date         Author                    Change Reference
@@ -52,8 +49,6 @@ DECLARE
   l_approve_contype BOOLEAN DEFAULT FALSE;
   l_new_eccma      INTEGER DEFAULT 0;
   _c text;
-
-  
 BEGIN
   raise notice 'Iniciando proceso de nuevos conceptos. Hora: %', current_timestamp;
 
@@ -70,7 +65,7 @@ BEGIN
   DROP TABLE IF EXISTS xx_eccma_new_rows;
   PERFORM xx_fn_log('Tablas xx_concept_news y xx_eccma_new_rows eliminadas: ' || now());
 
-  CREATE TABLE IF NOT EXISTS xx_concept_news AS (
+  CREATE TABLE xx_concept_news AS (
     SELECT tmp.*
      FROM tmp_dn tmp
     WHERE NOT EXISTS(SELECT 1 FROM concepts con WHERE con.eccma_eotd = tmp.concept_id));  
@@ -184,7 +179,7 @@ BEGIN
   PERFORM xx_fn_log('Nuevos languages, organizations y concept_types creados: ' || now());							   
   ----------------------------------------------------------------------------------------
   
-  CREATE TABLE IF NOT EXISTS xx_eccma_new_rows AS (
+  CREATE TABLE xx_eccma_new_rows AS (
     SELECT tmp2.*
         , org1.eccma_eotd eccma_eotd_org_term
         , org1.id id_org_term
@@ -433,13 +428,13 @@ BEGIN
   --// Obtiene la cifra de nuevas abreviaciones
   PERFORM xx_fn_log('Abreviaciones agregadas: ' || l_new_abbr);
 
-  PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || now());
+  PERFORM xx_fn_log('Cuarto ciclo terminado correctamente, hora: ' || now());
 
   EXCEPTION
      WHEN OTHERS THEN
         GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'context: >>%<<', _c;
-        raise notice 'Ha ocurrido un error en la función: xxkon_fn_upate_eotd';
+        raise notice 'Ha ocurrido un error en el script: 04_xx_eccma_new_concepts';
         raise notice 'Error: % %', sqlstate, sqlerrm;
 END;
 $$

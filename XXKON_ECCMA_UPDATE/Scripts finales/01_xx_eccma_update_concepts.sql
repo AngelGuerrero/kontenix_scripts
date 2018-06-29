@@ -1,22 +1,18 @@
 /*===============================================================+
-PROCEDURE:     XXKON_FN_UPDATE_ECCMA_EOTD
-DESCRIPTION:   Procedimiento para actualizar eOTD general.
+FILE:          01_xx_eccma_update_concepts
+DESCRIPTION:   Procedimiento anónimo para actualizar los conceptos existentes.
 RETURNS:       Void
-
-NOTES:         Script para realizar una actualización de registros en el eOTD
-               general, este script usa el principio que se había implementado en
-               Ruby, más sin embargo en vez de trabajar con archivos, trabaja con
-               tablas temporales, la tabla tmp1 es la tabla temporal donde se
-               encuentran los datos venidos de la India.
 
 HISTORY
 Version     Date         Author                    Change Reference
 1.0    12/Junio/2018    Ángel Guerrero           Creación del script
                         Hebert Hernández
 +================================================================*/
+
 DO
 $$
 DECLARE
+
   -- RECORD para recorrer la tabla que se ha creado de tipos de concepto
   l_record RECORD;
 
@@ -36,17 +32,17 @@ DECLARE
   
   l_count_tmp    INTEGER;
 BEGIN
-  raise notice 'Iniciando proceso de actualización de conceptos existentes. Hora: %', current_timestamp;
+  PERFORM xx_fn_log('Iniciando proceso de actualización de conceptos existentes. Hora: ' || now());
 
   -- Crea la tabla de donde se obtendrá la información en base a un concept type id
   PERFORM xx_fn_log('Borrando tabla XX_ECCMA_DATA_FROM_TMP');
-  --DROP TABLE IF EXISTS XX_ECCMA_DATA_FROM_TMP;
+  DROP TABLE IF EXISTS XX_ECCMA_DATA_FROM_TMP;
   DROP TABLE IF EXISTS xx_concepts;
 
   --//
   --// Crea otra tabla temporal para aumentar el performance
   PERFORM xx_fn_log('Creando la Tabla xx_concepts');
-  CREATE TABLE IF NOT EXISTS xx_concepts AS
+  CREATE TABLE xx_concepts AS
     SELECT tmp.*
            ,con.id id_concept
       FROM tmp_dn tmp
@@ -69,17 +65,18 @@ BEGIN
   PERFORM xx_fn_log('Actualizando conceptos existentes...');
   -- a) Actualiza los conceptos ya existentes de forma masiva
   WITH upsert_data AS (
-      SELECT * 
-        FROM tmp_dn
+      SELECT DISTINCT id_concept -- FIXUP: Se le aplicó un DISTINCT porque venían valores repetidos al nivel de ECCMA concept_id
+           , concept_is_deprecated  -- FIXUP: Únicamente se utilzan éstos dos campos...
+        FROM xx_concepts -- FIXUP: Se cambió el tmp_dn, por xx_concepts, que es la que debe de usar
       ),
       update_concept AS (
       UPDATE concepts
          SET is_deprecated =  CAST (upsert_data.concept_is_deprecated AS BOOLEAN),
              updated_at = current_timestamp
         FROM upsert_data
-       WHERE concepts.eccma_eotd = upsert_data.concept_id
+       WHERE concepts.id = upsert_data.id_concept
          AND concepts.is_deprecated <> CAST (upsert_data.concept_is_deprecated AS BOOLEAN)
-      RETURNING  concept_id
+      RETURNING  id -- FIXUP: No existe la columna concept_id
     )
   SELECT COUNT(1) 
     INTO l_upd_concepts 
@@ -89,16 +86,15 @@ BEGIN
   --// =================================================================================================================
   --// Datos que se van a actualizar
 
-  l_log_text := 'Conceptos actualizados: ' || l_upd_concepts;
-  PERFORM xx_fn_log(l_log_text);
+  PERFORM xx_fn_log('Conceptos actualizados: ' || l_upd_concepts);
 
-  PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || now());
+  PERFORM xx_fn_log('Primer ciclo terminado correctamente');
 
   EXCEPTION
      WHEN OTHERS THEN
         GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'context: >>%<<', _c;
-        raise notice 'Ha ocurrido un error en la función: xxkon_fn_upate_eotd';
+        raise notice 'Ha ocurrido un error en el script: 01_xx_eccma_update_concepts';
         raise notice 'Error: % %', sqlstate, sqlerrm;
 END;
 $$

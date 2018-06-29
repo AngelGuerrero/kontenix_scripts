@@ -1,19 +1,16 @@
 /*===============================================================+
-PROCEDURE:     XXKON_FN_UPDATE_ECCMA_EOTD
-DESCRIPTION:   Procedimiento para actualizar eOTD general.
-RETURNS:       Void
+PROCEDURE:     03
+DESCRIPTION:   Procedimiento anónimo para actualizar los registros
+               que fueron establecidos en el script número 2.
 
-NOTES:         Script para realizar una actualización de registros en el eOTD
-               general, este script usa el principio que se había implementado en
-               Ruby, más sin embargo en vez de trabajar con archivos, trabaja con
-               tablas temporales, la tabla tmp1 es la tabla temporal donde se
-               encuentran los datos venidos de la India.
+RETURNS:       Void
 
 HISTORY
 Version     Date         Author                    Change Reference
 1.0    12/Junio/2018    Ángel Guerrero           Creación del script
                         Hebert Hernández
 +================================================================*/
+
 DO
 $$
 DECLARE
@@ -49,9 +46,8 @@ DECLARE
   l_approve_contype BOOLEAN DEFAULT FALSE;
 
   _c text;
-  
 BEGIN
-  raise notice 'Iniciando proceso de actualización en tabla terminologicals. Hora: %', current_timestamp;
+  PERFORM xx_fn_log('Iniciando proceso de actualización en la tabla terminologicals. Hora: ' || now());
 
   --//
   --// Realiza las actualizaciones de las tablas generadas temporalmente para los términos
@@ -90,13 +86,13 @@ BEGIN
   --// =================================================================================================================
   --// Datos que se van a actualizar
 
-  PERFORM xx_fn_log('Ciclo terminado correctamente, hora: ' || now());
+  PERFORM xx_fn_log('Tercer ciclo terminado correctamente, hora: ' || now());
 
   EXCEPTION
      WHEN OTHERS THEN
         GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
         RAISE NOTICE 'context: >>%<<', _c;
-        raise notice 'Ha ocurrido un error en la función: xxkon_fn_upate_eotd';
+        raise notice 'Ha ocurrido un error en el script: 03_xx_eccma_update_terminologicals';
         raise notice 'Error: % %', sqlstate, sqlerrm;
 END;
 $$
