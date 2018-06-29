@@ -1,5 +1,5 @@
 /*===============================================================+
-FILE:          01_xx_eccma_loop_exists_concepts
+FILE:          02_xx_eccma_loop_exists_concepts
 DESCRIPTION:   Procedimiento anónimo para agregar términos, definiciones y
                abreviaciones de los conceptos ya existentes.
 
@@ -57,7 +57,7 @@ DECLARE
   _c text;
 BEGIN
   PERFORM xx_fn_log('Iniciando proceso para agregar terminos, definiciones y abreviaciones de conceptos existentes. Hora: ' || now());
-  
+
   raise notice 'Iniciando proceso de actualización. Hora: %', current_timestamp;
   raise notice 'Truncando tabla xx_eccma_update_terms';
   raise notice 'Truncando tabla xx_eccma_update_definition';
@@ -67,7 +67,7 @@ BEGIN
   TRUNCATE TABLE xx_eccma_update_defs;
   TRUNCATE TABLE xx_eccma_update_abbr;
 
-  
+
   INSERT INTO languages(id,
 						  eccma_eotd,
 						  country_code,
@@ -75,7 +75,7 @@ BEGIN
 						  description,
 						  code,
 						  created_at,
-						  updated_at) 
+						  updated_at)
 				SELECT nextval('languages_id_seq1'),
 					   A.language_id,
 					   A.country_code,
@@ -91,14 +91,14 @@ BEGIN
 				  FROM xx_concepts xc
 				 where 1=1
 				   AND LENGTH(language_id) > 0
-				   AND NOT EXISTS (SELECT 1 FROM languages l where l.eccma_eotd = xc.language_id ) )A;    
+				   AND NOT EXISTS (SELECT 1 FROM languages l where l.eccma_eotd = xc.language_id ) )A;
 
    INSERT INTO organizations(id,
 							 eccma_eotd,
 							 name,
 							 mail_address,
 							 created_at,
-							 updated_at) 
+							 updated_at)
 					 SELECT nextval('organizations_id_seq1'),
 						    B.term_organization_id,
 						    B.term_organization_name,
@@ -117,7 +117,7 @@ BEGIN
 							 name,
 							 mail_address,
 							 created_at,
-							 updated_at) 
+							 updated_at)
 					 SELECT nextval('organizations_id_seq1'),
 						    C.definition_organization_id,
 						    C.definition_organization_name,
@@ -136,7 +136,7 @@ BEGIN
 							 name,
 							 mail_address,
 							 created_at,
-							 updated_at) 
+							 updated_at)
 					 SELECT nextval('organizations_id_seq1'),
 						    D.abbreviation_organization_id,
 						    D.abbreviation_organization_name,
@@ -155,12 +155,12 @@ BEGIN
   PERFORM xx_fn_log('Borrando tabla XX_ECCMA_DATA_FROM_TMP');
   DROP TABLE IF EXISTS XX_ECCMA_DATA_FROM_TMP;
 
-  
+
   --//
   --// Pone la información de la tabla tmp1 en otra tabla temporal
   --// esto es porque la información irá aumentando
   PERFORM xx_fn_log('Creando tabla XX_ECCMA_DATA_FROM_TMP');
-  
+
   CREATE TABLE XX_ECCMA_DATA_FROM_TMP AS
      SELECT tmp.*
         , org1.eccma_eotd eccma_eotd_org_term
@@ -205,12 +205,12 @@ BEGIN
 
   PERFORM xx_fn_log('Ciclo de validacion para terminos, definiciones y abreviaciones - conceptos existentes...');
   -- 1) Ciclo para conceptos que si existen
-  FOR l_record IN (SELECT * FROM XX_ECCMA_DATA_FROM_TMP) 
+  FOR l_record IN (SELECT * FROM XX_ECCMA_DATA_FROM_TMP)
   LOOP
   --------------------------------------------------------------------------------------------------------
   --
   --------------------------------------------------------------------------------------------------------
-  
+
   -- b) Validar la organización del término
     --HHH 17 JUN 2018
     -- ESTE IF NO ESTABA, FALTABA AGREGARLO
@@ -225,8 +225,8 @@ BEGIN
             WHEN l_record.term_is_deprecated = '0' THEN l_term_is_deprecated := FALSE;
           ELSE l_term_is_deprecated := FALSE;
           END CASE;
-      
-        IF l_record.id_term IS NULL THEN 
+
+        IF l_record.id_term IS NULL THEN
         -- Si no se obtiene valores, se crea el nuevo término.
 
           --raise notice 'Insertando término en terminologicals';
@@ -261,7 +261,7 @@ BEGIN
 									 );
           l_new_terms := l_new_terms + 1;
         ELSE -- Actualiza entonces los términos, llena primero la tabla para los registros que serán actualizados
-          
+
           IF l_record.eccma_eotd_is_dep_term <> l_term_is_deprecated THEN
           --IF l_record.eccma_eotd_is_dep_term <> l_record.term_is_deprecated THEN
              INSERT INTO xx_eccma_update_terms VALUES (l_record.id_term,
@@ -326,7 +326,7 @@ BEGIN
                                                      l_def_is_deprecated,
                                                      l_record.definition_content,
                                                      l_record.definition_id
-                                                    ); 
+                                                    );
              l_upd_defs := l_upd_defs + 1;
           END IF;
         END IF;
@@ -361,7 +361,7 @@ BEGIN
                                        tsv_content,
                                        orginator_reference,
                                        created_at,
-                                       updated_at) 
+                                       updated_at)
 								 VALUES(
 									  nextval('terminologicals_id_seq1'),
 									  'abbreviation',
@@ -417,7 +417,7 @@ BEGIN
   PERFORM xx_fn_log('Abreviaciones a actualizar: ' || l_upd_abbr);
 
   PERFORM xx_fn_log('Segundo ciclo terminado correctamente, hora: ' || now());
-  
+
   EXCEPTION
      WHEN OTHERS THEN
         GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;

@@ -1,5 +1,5 @@
 /*===============================================================+
-PROCEDURE:     04_xx_eccma_new_concepts
+FILE:     04_xx_eccma_new_concepts
 DESCRIPTION:   Procedimiento anónimo para agregar todos los registros
 			   que no están en la base de Kontenix
 
@@ -50,7 +50,7 @@ DECLARE
   l_new_eccma      INTEGER DEFAULT 0;
   _c text;
 BEGIN
-  raise notice 'Iniciando proceso de nuevos conceptos. Hora: %', current_timestamp;
+  PERFORM xx_fn_log('Iniciando proceso de nuevos conceptos. Hora: ' || now());
 
   raise notice '================================================================================';
 
@@ -68,10 +68,10 @@ BEGIN
   CREATE TABLE xx_concept_news AS (
     SELECT tmp.*
      FROM tmp_dn tmp
-    WHERE NOT EXISTS(SELECT 1 FROM concepts con WHERE con.eccma_eotd = tmp.concept_id));  
-  
+    WHERE NOT EXISTS(SELECT 1 FROM concepts con WHERE con.eccma_eotd = tmp.concept_id));
+
   PERFORM xx_fn_log('Tabla xx_concept_news creada: ' || now());
-  
+
    INSERT INTO languages(id,
 						  eccma_eotd,
 						  country_code,
@@ -79,7 +79,7 @@ BEGIN
 						  description,
 						  code,
 						  created_at,
-						  updated_at) 
+						  updated_at)
 				SELECT nextval('languages_id_seq1'),
 					   A.language_id,
 					   A.country_code,
@@ -95,14 +95,14 @@ BEGIN
 				  FROM xx_concept_news xc
 				 where 1=1
 				   AND LENGTH(language_id) > 0
-				   AND NOT EXISTS (SELECT 1 FROM languages l where l.eccma_eotd = xc.language_id ) )A;    
+				   AND NOT EXISTS (SELECT 1 FROM languages l where l.eccma_eotd = xc.language_id ) )A;
 
    INSERT INTO organizations(id,
 							 eccma_eotd,
 							 name,
 							 mail_address,
 							 created_at,
-							 updated_at) 
+							 updated_at)
 					 SELECT nextval('organizations_id_seq1'),
 						    B.term_organization_id,
 						    B.term_organization_name,
@@ -121,7 +121,7 @@ BEGIN
 							 name,
 							 mail_address,
 							 created_at,
-							 updated_at) 
+							 updated_at)
 					 SELECT nextval('organizations_id_seq1'),
 						    C.definition_organization_id,
 						    C.definition_organization_name,
@@ -140,7 +140,7 @@ BEGIN
 							 name,
 							 mail_address,
 							 created_at,
-							 updated_at) 
+							 updated_at)
 					 SELECT nextval('organizations_id_seq1'),
 						    D.abbreviation_organization_id,
 						    D.abbreviation_organization_name,
@@ -152,7 +152,7 @@ BEGIN
 						    FROM xx_concept_news xc
 						   where 1=1
 						     AND LENGTH(abbreviation_organization_id) >0
-						     AND NOT EXISTS (SELECT 1 FROM organizations o where o.eccma_eotd = xc.abbreviation_organization_id )) D; 
+						     AND NOT EXISTS (SELECT 1 FROM organizations o where o.eccma_eotd = xc.abbreviation_organization_id )) D;
 
 
    INSERT INTO concept_types(id,
@@ -168,17 +168,17 @@ BEGIN
 						    NULL,
 							(SELECT LPAD(CAST(MAX(CAST(code AS INTEGER)) +1 AS VARCHAR), 2, '0') FROM concept_types),
 						    current_timestamp,
-						    current_timestamp		 
+						    current_timestamp
                       FROM (SELECT DISTINCT concept_type_id,
 											concept_type_name
 							  FROM xx_concept_news xc
 							 WHERE 1=1
 							   AND LENGTH(concept_type_id) >0
-							   AND NOT EXISTS (SELECT 1 FROM concept_types c WHERE c.eccma_eotd = xc.concept_type_id )) E;    
+							   AND NOT EXISTS (SELECT 1 FROM concept_types c WHERE c.eccma_eotd = xc.concept_type_id )) E;
 
-  PERFORM xx_fn_log('Nuevos languages, organizations y concept_types creados: ' || now());							   
+  PERFORM xx_fn_log('Nuevos languages, organizations y concept_types creados: ' || now());
   ----------------------------------------------------------------------------------------
-  
+
   CREATE TABLE xx_eccma_new_rows AS (
     SELECT tmp2.*
         , org1.eccma_eotd eccma_eotd_org_term
@@ -199,17 +199,17 @@ BEGIN
      JOIN concept_types ct   ON ct.eccma_eotd = tmp2.concept_type_id);
 
   PERFORM xx_fn_log('Tabla xx_eccma_new_rows creada para nuevos conceptos: ' || now());
-  
+
   FOR l_record IN (SELECT *
                      FROM xx_eccma_new_rows
-                    WHERE LENGTH(concept_type_id) > 0 ) 
+                    WHERE LENGTH(concept_type_id) > 0 )
   LOOP
 
     --// ===============================================================================================================
 
     IF LENGTH(l_record.concept_type_id) > 0 THEN
 	--raise notice 'concept_type : %', l_record.concept_type_id;
-	
+
       --// Validación si el concepto ya está en la base de datos de Kontenix
       BEGIN
         SELECT id
@@ -234,7 +234,7 @@ BEGIN
                                created_at,
                                updated_at,
                                concept_type_id)
-						 VALUES( 
+						 VALUES(
 							   nextval('concepts_id_seq1'),
 							 l_record.concept_id,
 							 l_con_is_deprecated,
@@ -242,7 +242,7 @@ BEGIN
 							 current_timestamp,
 							 l_record.id_concept_type
 						   )
-        RETURNING id INTO l_concept_id; 
+        RETURNING id INTO l_concept_id;
         l_new_concepts := l_new_concepts + 1;
       END IF;
 
@@ -250,9 +250,9 @@ BEGIN
       --// NUEVOS TÉRMINOS
       --// Validación de language
       --raise notice 'concept_id : %', l_concept_id;
-	  
-	  IF LENGTH(l_record.language_id) >0  THEN 
-		  
+
+	  IF LENGTH(l_record.language_id) >0  THEN
+
 		  --// Validar que el término no venga nulo, y que la organización exista
 		  IF LENGTH(l_record.term_id) >0 AND LENGTH(l_record.term_organization_id) >0 THEN
 
@@ -261,7 +261,7 @@ BEGIN
 			  WHEN l_record.term_is_deprecated = '0' THEN l_term_is_deprecated := FALSE;
 			  ELSE l_term_is_deprecated := FALSE;
 			END CASE;
-            
+
 			--raise notice 'org_id : %', l_org_id;
 			--// Insertando un nuevo término si es que no existe éste eccma term
 			IF l_record.id_language > 0 AND  l_record.id_org_term >0 THEN
@@ -309,7 +309,7 @@ BEGIN
 			  WHEN l_record.definition_is_deprecated = '0' THEN l_def_is_deprecated := FALSE;
 			ELSE l_def_is_deprecated := FALSE;
 			END CASE;
-			
+
             IF l_record.id_language > 0 AND  l_record.id_org_definition >0 THEN
 				INSERT INTO terminologicals (id,
 											 terminology_class,
@@ -349,10 +349,10 @@ BEGIN
 		  --// Validar que la abreviación organización esté creada
 
 		  IF LENGTH(l_record.abbreviation_id) >0 AND LENGTH(l_record.abbreviation_organization_id) >0 THEN
-			
-			
+
+
 			BEGIN
-			   SELECT id 
+			   SELECT id
 			     INTO STRICT l_term_id
 				 FROM terminologicals
 				WHERE 1=1
@@ -362,14 +362,14 @@ BEGIN
 			   WHEN OTHERS THEN
 			   l_term_id := 0;
 			END;
-			
+
 			BEGIN
 			  CASE
 				WHEN l_record.abbreviation_is_deprecated = '1' THEN l_abbr_is_deprecated := TRUE;
 				WHEN l_record.abbreviation_is_deprecated = '0' THEN l_abbr_is_deprecated := FALSE;
 			  ELSE l_abbr_is_deprecated := FALSE;
 			  END CASE;
-              
+
 			  IF l_record.id_language > 0 AND  l_record.id_org_abbreviation >0 THEN
 				  INSERT INTO terminologicals (id,
 											   terminology_class,
@@ -383,7 +383,7 @@ BEGIN
 											   tsv_content,
 											   concept_id,
 											   created_at,
-											   updated_at) 
+											   updated_at)
 										 VALUES(
 											 nextval('terminologicals_id_seq1'),
 											 'abbreviation',
@@ -399,13 +399,13 @@ BEGIN
 											 current_timestamp,
 											 current_timestamp
 											 );
-			     l_new_abbr := l_new_abbr + 1;								 
-			  END IF;							 
+			     l_new_abbr := l_new_abbr + 1;
+			  END IF;
 		    EXCEPTION
 		    WHEN OTHERS THEN
 			   GET STACKED DIAGNOSTICS _c = PG_EXCEPTION_CONTEXT;
 			   raise notice 'context: >>%<<', _c;
-			END;		
+			END;
 		  END IF;-- ABBREVIATION_ID
 	  END IF; -- END IF DE VALIDACION DEL LANGUAGE
     END IF; -- END IF DE LA VALIDACION DEL TIPO DE CONCEPTO

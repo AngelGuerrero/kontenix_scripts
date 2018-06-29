@@ -1,5 +1,5 @@
 /*===============================================================+
-PROCEDURE:     03
+FILE:     03_xx_eccma_update_terminologicals
 DESCRIPTION:   Procedimiento anónimo para actualizar los registros
                que fueron establecidos en el script número 2.
 
