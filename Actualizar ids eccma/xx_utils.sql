@@ -17,3 +17,5 @@ WITH (
 OIDS = FALSE
 )
 TABLESPACE pg_default;
+
+CREATE TABLE IF NOT EXISTS xxdata_not_found(terminology_class VARCHAR(20), eccma_eotd VARCHAR(20), content TEXT, created_at TIMESTAMP, updated_at TIMESTAMP);
