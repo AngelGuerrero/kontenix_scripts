@@ -28,16 +28,19 @@ BEGIN
   DROP TABLE IF EXISTS xx_concepts_exists;
   DROP TABLE IF EXISTS xx_concepts_not_exists;
 
+  --// Crea una tabla para los conceptos a los cuales se les asignará un nuevo ECCMA id
   CREATE TABLE IF NOT EXISTS xx_concepts_not_exists AS (
-    SELECT *
+    SELECT x.*
       FROM xx_eccma_new_ids x
      WHERE 1 = 1
        AND NOT EXISTS(SELECT c.eccma_eotd
                         FROM concepts c
-                       WHERE c.eccma_eotd = x.eccma_concept_id)
+                       WHERE c.eccma_eotd = x.eccma_concept_id
+                     )
        AND x.eccma_concept_id IS NOT NULL
   );
 
+  --// Selecciona los conceptos que ya tienen un ECCMA id
   CREATE TABLE IF NOT EXISTS xx_concepts_exists AS (
     SELECT *
     FROM xx_eccma_new_ids x
@@ -48,45 +51,97 @@ BEGIN
       AND x.eccma_concept_id IS NOT NULL
   );
 
+  ------------------------
+
   --// Verifica los términos que no están en la base de datos de Kontenix
+
+  --//
+  --// Verifica primero para los conceptos que ya existen
   INSERT INTO xxdata_not_found(terminology_class, eccma_eotd, content, created_at, updated_at)
     SELECT 'term', eccma_term_id, term_content, current_timestamp, current_timestamp
       FROM (SELECT xeccma.term_content
                  , xeccma.eccma_term_id
-               FROM xx_eccma_new_ids xeccma
+               FROM xx_concepts_exists xeccma --// Términos con un concept id eccma asociado
                WHERE 1 = 1
                  AND xeccma.eccma_term_id IS NOT NULL --// Que no venga vacío el campo del id eccma término
                  AND NOT EXISTS(SELECT term.content
                                   FROM terminologicals term
                                      , concepts con
-                                 WHERE term.terminology_class = 'term'
+                                 WHERE 1 = 1
+                                   -- Match
                                    AND term.content = xeccma.term_content
-                                   AND term.term_id IS NULL
+                                   AND term.terminology_class = 'term'
+                                   -- Other conditions
                                    AND term.concept_id = con.id
-                                   AND con.eccma_eotd = xeccma.eccma_concept_id
                                )) A;
 
-  --// Verifica las definiciones que no están en la base de datos de Kontenix
+  --//
+  --// Después para los conceptos que no tienen un eccma id
   INSERT INTO xxdata_not_found(terminology_class, eccma_eotd, content, created_at, updated_at)
-    SELECT 'definition', eccma_definition_id, definition_content, current_timestamp, current_timestamp
-      FROM (SELECT xeccma.definition_content
-                 , xeccma.eccma_definition_id
-               FROM xx_eccma_new_ids xeccma
+    SELECT 'term', eccma_term_id, term_content, current_timestamp, current_timestamp
+      FROM (SELECT xeccma.term_content
+                 , xeccma.eccma_term_id
+               FROM xx_concepts_not_exists xeccma --// Términos SIN un concept id eccma asociado
                WHERE 1 = 1
-                 AND xeccma.eccma_definition_id IS NOT NULL --// Que no venga vacío el campo del id eccma definición
+                 AND xeccma.eccma_term_id IS NOT NULL --// Que no venga vacío el campo del id eccma término
                  AND NOT EXISTS(SELECT term.content
                                   FROM terminologicals term
                                      , concepts con
-                                     , languages lan
                                  WHERE 1 = 1
-                                   AND term.terminology_class = 'definition'
-                                   AND term.content = xeccma.definition_content
-                                   AND term.term_id IS NULL
-                                   AND term.language_id = lan.id
-                                   AND lan.eccma_eotd = xeccma.eccma_language_id
+                                   -- Match
+                                   AND term.content = xeccma.term_content
+                                   AND term.terminology_class = 'term'
+                                   -- Other conditions
                                    AND term.concept_id = con.id
-                                   AND con.eccma_eotd = xeccma.eccma_concept_id
-                                )) A;
+                               )) A;
+
+
+
+  --// Verifica las definiciones que no están en la base de datos de Kontenix
+
+  --//
+  --// Verifica primero para los conceptos que ya tienen un ECCMA id asociado
+  INSERT INTO xxdata_not_found(terminology_class, eccma_eotd, content, created_at, updated_at)
+    SELECT 'definition', eccma_definition_id, definition_content, current_timestamp, current_timestamp
+      FROM (SELECT x.definition_content
+                 , x.eccma_definition_id
+                 , x.eccma_concept_id
+               FROM xx_concepts_exists x --// Para conceptos CON un eccma id asociado
+               WHERE 1 = 1
+                 AND x.eccma_definition_id IS NOT NULL --// Que no venga vacío el campo del id eccma definición
+                 AND NOT EXISTS(SELECT t.content
+                                  FROM terminologicals t
+                                     , concepts c
+                                 WHERE 1 = 1
+                                   -- Match
+                                   AND t.content = x.definition_content
+                                   AND t.concept_id = c.id
+                                   AND c.eccma_eotd = x.eccma_concept_id
+                                   -- Other conditions
+                                   AND t.terminology_class = 'definition'
+                                )) A
+  ;
+
+  --//
+  --// Después para los conceptos que NO tienen un ECCMA id asociado
+  INSERT INTO xxdata_not_found(terminology_class, eccma_eotd, content, created_at, updated_at)
+    SELECT 'definition', eccma_definition_id, definition_content, current_timestamp, current_timestamp
+      FROM (SELECT x.definition_content
+                 , x.eccma_definition_id
+                 , x.eccma_concept_id
+               FROM xx_concepts_not_exists x --// Para conceptos CON un eccma id asociado
+               WHERE 1 = 1
+                 AND x.eccma_definition_id IS NOT NULL --// Que no venga vacío el campo del id eccma definición
+                 AND NOT EXISTS(SELECT t.content
+                                  FROM terminologicals t
+                                     --, languages l
+                                 WHERE 1 = 1
+                                   -- Match
+                                   AND t.content = x.definition_content
+                                   -- Other conditions
+                                   AND t.terminology_class = 'definition'
+                                )) A
+  ;
 
   --// Verifica las abreviaciones que no están en la base de datos de Kontenix
   INSERT INTO xxdata_not_found(terminology_class, eccma_eotd, content, created_at, updated_at)
@@ -100,8 +155,10 @@ BEGIN
                  AND NOT EXISTS(SELECT term.content
                                   FROM terminologicals term
                                  WHERE 1 = 1
-                                   AND term.terminology_class = 'abbreviation'
+                                   -- Match
                                    AND term.content = xeccma.abbreviation_content
+                                   -- Other conditions
+                                   AND term.terminology_class = 'abbreviation'
                                    AND term.term_id IS NOT NULL
                                 )) A;
 
