@@ -21,7 +21,7 @@ DECLARE
 
 BEGIN
 
-  raise notice 'Inicio proceso...';
+  raise notice 'Proceso de actualización de IDs ECCMA';
 
   TRUNCATE xxdata_not_found;
 
@@ -29,7 +29,7 @@ BEGIN
   DROP TABLE IF EXISTS xx_concepts_not_exists;
 
   --// Crea una tabla para los conceptos a los cuales se les asignará un nuevo ECCMA id
-  CREATE TABLE IF NOT EXISTS xx_concepts_not_exists AS (
+  CREATE TABLE xx_concepts_not_exists AS (
     SELECT x.*
       FROM xx_eccma_new_ids x
      WHERE 1 = 1
@@ -41,7 +41,7 @@ BEGIN
   );
 
   --// Selecciona los conceptos que ya tienen un ECCMA id
-  CREATE TABLE IF NOT EXISTS xx_concepts_exists AS (
+  CREATE TABLE xx_concepts_exists AS (
     SELECT *
     FROM xx_eccma_new_ids x
     WHERE 1 = 1
