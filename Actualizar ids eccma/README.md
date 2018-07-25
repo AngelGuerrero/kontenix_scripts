@@ -103,6 +103,8 @@ Salir de psql en Postgres:  \q
 Mostrar las tablas existes de la base de datos conectada: \dt
 Mostrar los usuarios existentes: \du
 Mostrar todos los objetos de la base de datos conectada: \d
+Listar las bases de datos existentes: \l
+Cambiar de base de datos: \c [nombre_BD]
 Salir de la pantalla si se ejecutó algún comando anterior: q
 ```
 
@@ -112,10 +114,90 @@ Una vez que se han realizado los pasos anteriores, se procede a ejecutar el proc
 
 [xx_update_ids_eccma.sql](/uploads/ecf714ba25536741922f11f4be82aab0/xx_update_ids_eccma.sql)
 
-
-
 ---
 
+# Pasos para la recuperación de la base de datos
+
+Deben seguirse si es que llegara a ocurrir un error con la integridad de la base de datos.
+
+## 1 Verificar que se tiene un "dump"
+Es importante que se verifique si se tiene un dump de la última versión de la base de datos a la mano.
+
+## 2 Borrar la base de datos que se desea restaurar
+Para continuar con este paso es necesario primero conectarse a `psql` para ejecutar los comandos correspondientes.
+
+### 2.1 Conexión a psql Staging
+
+Conexión a mediante terminal en Staging:
+`psql -h localhost -U postgres`
+
+Contraseña: `postgres`
+
+### 2.1 Conexión a psql Producción
+
+Conexión mediante terminal en Producción: `psql -h kontenix.cuxppvqpu0tq.us-east-1.rds.amazonaws.com -U postgres`
+
+Contraseña: `=wvdi2ULT9*Bak`
+
+### 2.2 Borrar base de datos
+Una vez que se está conectado a `psql` con el usuario `postgres`, no con la base de datos, se ejecuta la siguiente instrucción.
+
+#### Instrucción para Staging
+Instrucción: `DROP DATABASE kontenix_development;`
+
+#### Instrucción para Producción
+Instrucción: `DROP DATABASE kontenix;`
+
+## 3 Crear la base de datos
+Manteniendo la conexión a `psql` es necesario crear la base de datos.
+
+### 3.1 Instrucción para crear BD Staging
+- `CREATE DATABASE kontenix_development;`
+
+### 3.1 Instrucción para crear BD Producción
+- `CREATE DATABASE kontenix;`
+
+## 4 Restaurar base de datos
+Una vez que ya está creada la base de datos se procede a restaurarla.
+
+> Nota: Se puede verificar si la base de datos está creada ejecutando la instrucción desde psql:  `\l`
+
+Para restaurar la base de datos se debe de posicionar o ubicar el dump con el que se desea restaurar la BD.
+
+Desde el prompt normal de la terminal de Linux se debe ejecutar el siguiente comando (ejemplo si el dump estuviera en directorio raíz):
+
+### 4.1 Restaurar BD Staging
+
+Instrucción: `pg_restore -h localhost -U postgres -d kontenix_development -v {NOMBRE_ARCHIVO.dump}`
+
+Contraseña: `postgres`
+
+### 4.1 Restaurar BD Producción
+Instrucción: `pg_restore -h kontenix.cuxppvqpu0tq.us-east-1.rds.amazonaws.com -U postgres -d kontenix -v {NOMBRE_ARCHIVO.dump}`
+
+Contraseña: `=wvdi2ULT9*Bak`
+
+## 5 Verificar los datos restaurados
+Se puede hacer una simple verificación de los datos restaurados ejecutando el siguiente Query desde pgAdmin.
+
+Query:
+```
+SELECT t.terminology_class, ct.name, count(1)
+  FROM terminologicals t,
+        concepts C,
+        concept_types ct
+ WHERE 1 = 1
+   -- Match
+   AND c.concept_type_id = ct.id
+   AND t.concept_id = c.id
+   -- Other conditions
+   AND t.is_deprecated IS FALSE
+   AND t.terminology_class IN ('term','definition')
+ GROUP BY t.terminology_class, ct.name
+ ORDER BY 1,2;
+```
+
+--- 
 ## Datos requeridos para la conexión a pgAdmin
 
 ## Datos para Staging
